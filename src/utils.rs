@@ -1,11 +1,11 @@
-use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk};
+use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk, CpuExt};
 
 pub struct Processor {
 	threads: usize,
 	min1: f64,
 	min5: f64,
 	min15: f64,
-	percent: f64
+	percent: f32
 }
 
 pub struct Memory {
@@ -90,8 +90,12 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 			CPU.min5 = sys.load_average().five;
 			CPU.min15 = sys.load_average().fifteen;
 
-			let cpu_percent: f64 = (sys.load_average().one / CPU.threads as f64) * 100.0;
-			CPU.percent = if !f64::is_nan(cpu_percent) { cpu_percent } else { 0.0 };
+			let mut cpu_loads: Vec<f32> = Vec::new();
+			for cpu in sys.cpus(){
+				cpu_loads.push(cpu.cpu_usage());
+			}
+			let cpu_load_sum: f32 = cpu_loads.iter().sum();
+			CPU.percent = cpu_load_sum / cpu_loads.len() as f32;
 
 			MEMORY.total = sys.total_memory();
 			MEMORY.available = sys.available_memory();
