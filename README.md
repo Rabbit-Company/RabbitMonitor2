@@ -10,6 +10,8 @@ API Endpoints:
 ```bash
 # Download the binary
 wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v3.0.0/rabbitmonitor
+# Give permissions
+sudo chmod 777 rabbitmonitor
 # Place the binary to `/usr/local/bin`
 sudo cp rabbitmonitor /usr/local/bin
 # Start the monitor
