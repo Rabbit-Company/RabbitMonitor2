@@ -138,23 +138,23 @@ pub fn create_metrics() -> String{
 	metrics += &create_metric("gauge", "cpu_load_1min", "CPU load recorded in last minute", unsafe { &CPU.min1.to_string() });
 	metrics += &create_metric("gauge", "cpu_load_5min", "CPU load recorded in last 5 minutes", unsafe { &CPU.min5.to_string() });
   metrics += &create_metric("gauge", "cpu_load_15min", "CPU load recorded in last 15 minutes", unsafe { &CPU.min15.to_string() });
-  metrics += &create_metric("gauge", "cpu_load_percent", "CPU load in percent", unsafe { &CPU.percent.to_string() });
+  metrics += &create_metric("gauge", "cpu_load_percent", "CPU load in percent", unsafe { &format!("{:.2}", CPU.percent) });
   // Memory
   metrics += &create_metric("gauge", "memory_total", "Total memory in bytes", unsafe { &MEMORY.total.to_string() });
   metrics += &create_metric("gauge", "memory_available", "Available memory in bytes", unsafe { &MEMORY.available.to_string() });
-  metrics += &create_metric("gauge", "memory_percent", "Used memory in percent", unsafe { &MEMORY.percent.to_string() });
   metrics += &create_metric("gauge", "memory_used", "Used memory in bytes", unsafe { &MEMORY.used.to_string() });
   metrics += &create_metric("gauge", "memory_free", "Free memory in bytes", unsafe { &MEMORY.free.to_string() });
+	metrics += &create_metric("gauge", "memory_percent", "Used memory in percent", unsafe { &format!("{:.2}", MEMORY.percent) });
   // Swap
   metrics += &create_metric("gauge", "swap_total", "Total swap storage in bytes", unsafe { &SWAP.total.to_string() });
   metrics += &create_metric("gauge", "swap_used", "Used swap storage in bytes", unsafe { &SWAP.used.to_string() });
   metrics += &create_metric("gauge", "swap_free", "Free swap storage in bytes", unsafe { &SWAP.free.to_string() });
-  metrics += &create_metric("gauge", "swap_percent", "Used swap storage in percent", unsafe { &SWAP.percent.to_string() });
+  metrics += &create_metric("gauge", "swap_percent", "Used swap storage in percent", unsafe { &format!("{:.2}", SWAP.percent) });
   // Storage
   metrics += &create_metric("gauge", "storage_total", "Total storage in bytes", unsafe { &STORAGE.total.to_string() });
   metrics += &create_metric("gauge", "storage_used", "Used storage in bytes", unsafe { &STORAGE.used.to_string() });
   metrics += &create_metric("gauge", "storage_free", "Free storage in bytes", unsafe { &STORAGE.free.to_string() });
-  metrics += &create_metric("gauge", "storage_percent", "Used storage in percent", unsafe { &STORAGE.percent.to_string() });
+  metrics += &create_metric("gauge", "storage_percent", "Used storage in percent", unsafe { &format!("{:.2}", STORAGE.percent) });
 	// Network
 	metrics += &create_metric("gauge", "network_download", "Download speed in bytes", unsafe { &NETWORK.download.to_string() });
 	metrics += &create_metric("gauge", "network_upload", "Upload speed in bytes", unsafe { &NETWORK.upload.to_string() });
