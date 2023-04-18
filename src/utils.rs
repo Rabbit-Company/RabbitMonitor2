@@ -1,4 +1,4 @@
-use sysinfo::{NetworkExt, System, SystemExt};
+use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk};
 
 pub struct Processor {
 	threads: usize,
@@ -100,11 +100,21 @@ pub fn initialize(cache: u64, interface: String){
 			SWAP.free = sys.free_swap();
 			SWAP.percent = (sys.used_swap() as f64 / sys.total_swap() as f64) * 100.0;
 
-			/*
+			let mut available_storage: u64 = 0;
+			let mut total_storage: u64 = 0;
 			for disk in sys.disks() {
-				println!("{:?}", disk);
+				if Disk::mount_point(disk).to_str().unwrap().eq("/") {
+					available_storage += Disk::available_space(disk);
+					total_storage += Disk::total_space(disk);
+					break;
+				}
 			}
-			*/
+			STORAGE.free = available_storage;
+			STORAGE.total = total_storage;
+
+			let used_storage: u64 = total_storage - available_storage;
+			STORAGE.used = used_storage;
+			STORAGE.percent = (used_storage as f64 / total_storage as f64) * 100.0;
 
 			for (interface_name, data) in sys.networks(){
 				if interface_name.eq(&interface) {
