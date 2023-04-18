@@ -89,18 +89,24 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 			CPU.min1 = sys.load_average().one;
 			CPU.min5 = sys.load_average().five;
 			CPU.min15 = sys.load_average().fifteen;
-			CPU.percent = (sys.load_average().one / CPU.threads as f64) * 100.0;
+
+			let cpu_percent: f64 = (sys.load_average().one / CPU.threads as f64) * 100.0;
+			CPU.percent = if !f64::is_nan(cpu_percent) { cpu_percent } else { 0.0 };
 
 			MEMORY.total = sys.total_memory();
 			MEMORY.available = sys.available_memory();
 			MEMORY.used = sys.used_memory();
 			MEMORY.free = sys.free_memory();
-			MEMORY.percent = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
+
+			let memory_percent: f64 = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
+			MEMORY.percent = if !f64::is_nan(memory_percent) { memory_percent } else { 0.0 };
 
 			SWAP.total = sys.total_swap();
 			SWAP.used = sys.used_swap();
 			SWAP.free = sys.free_swap();
-			SWAP.percent = (sys.used_swap() as f64 / sys.total_swap() as f64) * 100.0;
+
+			let swap_percent: f64 = (sys.used_swap() as f64 / sys.total_swap() as f64) * 100.0;
+			SWAP.percent = if !f64::is_nan(swap_percent) { swap_percent } else { 0.0 };
 
 			let mut available_storage: u64 = 0;
 			let mut total_storage: u64 = 0;
@@ -113,10 +119,11 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 			}
 			STORAGE.free = available_storage;
 			STORAGE.total = total_storage;
-
 			let used_storage: u64 = total_storage - available_storage;
 			STORAGE.used = used_storage;
-			STORAGE.percent = (used_storage as f64 / total_storage as f64) * 100.0;
+
+			let storage_percent: f64 = (used_storage as f64 / total_storage as f64) * 100.0;
+			STORAGE.percent = if !f64::is_nan(storage_percent) { storage_percent } else { 0.0 };
 
 			for (interface_name, data) in sys.networks(){
 				if interface_name.eq(&interface) {
