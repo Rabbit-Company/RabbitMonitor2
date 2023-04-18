@@ -1,14 +1,16 @@
 [package]
 name = "rabbitmonitor"
-version = "0.1.0"
-authors = ["Rabbit Company LLC"]
+version = "3.0.0"
+authors = ["Rabbit Company LLC <info@rabbit-company.com>"]
 description = "Simple server monitor"
 edition = "2021"
+repository = "https://github.com/Rabbit-Company/RabbitMonitor2"
+license = "GPL-3.0"
+readme = "README.md"
+rust-version = "1.68.2"
 categories = ["command-line-utilities"]
-repository = "https://github.com/Rabbit-Company/RabbitMonitor"
 keywords = ["cli", "process-monitoring"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+publish = ["rabbitmonitor"]
 
 [dependencies]
 clap = { version = "4.2.2", features = ["derive"] }
