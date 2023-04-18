@@ -23,6 +23,10 @@ struct Args {
 	/// Network interface name for monitoring network
 	#[arg(short, long, default_value_t = String::from("eth0"))]
 	interface: String,
+
+	/// Logger level
+	#[arg(short, long, default_value_t = 1)]
+	logger: u8,
 }
 
 #[get("/")]
@@ -41,7 +45,7 @@ fn rocket() -> _ {
 	let args: Args = Args::parse();
 
 	std::thread::spawn(move || {
-		utils::initialize(args.cache, args.interface);
+		utils::initialize(args.cache, args.interface, args.logger);
 	});
 
 	let figment: rocket::figment::Figment = rocket::Config::figment()
