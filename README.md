@@ -20,7 +20,7 @@ rabbitmonitor
 
 # Daemonizing (using systemd)
 
-Running Rabbit Monitor in the background is a simple task, just make sure that it runs without errors before doing this. Place the contents below in a file called `rabbitmonitor.service` in the `/etc/systemd/system` directory.
+Running Rabbit Monitor in the background is a simple task, just make sure that it runs without errors before doing this. Place the contents below in a file called `rabbitmonitor.service` in the `/etc/systemd/system/` directory.
 
 ```service
 [Unit]

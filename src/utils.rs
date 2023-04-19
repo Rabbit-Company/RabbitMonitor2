@@ -1,6 +1,15 @@
+use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::thread::sleep;
+use std::time::Duration;
 use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk, CpuExt};
 
-pub struct Processor {
+struct Settings {
+	cache: u64,
+	logger: u8
+}
+
+struct Processor {
 	threads: usize,
 	min1: f64,
 	min5: f64,
@@ -8,26 +17,26 @@ pub struct Processor {
 	percent: f32
 }
 
-pub struct Memory {
+struct Memory {
 	total: u64,
 	available: u64,
 	used: u64,
 	free: u64,
-	percent: f64,
+	percent: f64
 }
 
 pub struct Swap {
 	total: u64,
 	used: u64,
 	free: u64,
-	percent: f64,
+	percent: f64
 }
 
 pub struct Storage {
 	total: u64,
 	used: u64,
 	free: u64,
-	percent: f64,
+	percent: f64
 }
 
 pub struct Network {
@@ -35,109 +44,145 @@ pub struct Network {
 	upload: u64
 }
 
-pub static mut CPU: Processor = Processor{
+static GLOBAL_SETTINGS: Mutex<Settings> = Mutex::new(Settings {
+	cache: 5,
+	logger: 1
+});
+
+static GLOBAL_CPU: Mutex<Processor> = Mutex::new(Processor {
 	threads: 0,
 	min1: 0.0,
 	min5: 0.0,
 	min15: 0.0,
 	percent: 0.0
-};
+});
 
-pub static mut MEMORY: Memory = Memory{
+static GLOBAL_MEMORY: Mutex<Memory> = Mutex::new(Memory {
 	total: 0,
 	available: 0,
 	used: 0,
 	free: 0,
-	percent: 0.0,
-};
+	percent: 0.0
+});
 
-pub static mut SWAP: Swap = Swap{
+static GLOBAL_SWAP: Mutex<Swap> = Mutex::new(Swap {
 	total: 0,
 	used: 0,
 	free: 0,
-	percent: 0.0,
-};
+	percent: 0.0
+});
 
-pub static mut STORAGE: Storage = Storage{
+static GLOBAL_STORAGE: Mutex<Storage> = Mutex::new(Storage {
 	total: 0,
 	used: 0,
 	free: 0,
-	percent: 0.0,
-};
+	percent: 0.0
+});
 
-pub static mut NETWORK: Network = Network{
+static GLOBAL_NETWORK: Mutex<Network> = Mutex::new(Network {
 	download: 0,
 	upload: 0
-};
+});
 
-pub static mut CACHE: u64 = 0;
-pub static mut LOGGER: u8 = 1;
+pub fn extract_cpu(sys: &System){
+	let mut cpu: MutexGuard<Processor> = GLOBAL_CPU.lock().unwrap();
+
+	cpu.min1 = sys.load_average().one;
+	cpu.min5 = sys.load_average().five;
+	cpu.min15 = sys.load_average().fifteen;
+
+	let mut cpu_loads: Vec<f32> = Vec::new();
+	for cpu in sys.cpus(){
+		cpu_loads.push(cpu.cpu_usage());
+	}
+	let cpu_load_sum: f32 = cpu_loads.iter().sum();
+	cpu.percent = cpu_load_sum / cpu_loads.len() as f32;
+
+	drop(cpu);
+}
+
+pub fn extract_memory(sys: &System){
+	let mut memory: MutexGuard<Memory> = GLOBAL_MEMORY.lock().unwrap();
+
+	memory.total = sys.total_memory();
+	memory.available = sys.available_memory();
+	memory.used = sys.used_memory();
+	memory.free = sys.free_memory();
+
+	let memory_percent: f64 = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
+	memory.percent = if !f64::is_nan(memory_percent) { memory_percent } else { 0.0 };
+
+	drop(memory);
+}
+
+pub fn extract_swap(sys: &System){
+	let mut swap: MutexGuard<Swap> = GLOBAL_SWAP.lock().unwrap();
+
+	swap.total = sys.total_swap();
+	swap.used = sys.used_swap();
+	swap.free = sys.free_swap();
+
+	let swap_percent: f64 = (sys.used_swap() as f64 / sys.total_swap() as f64) * 100.0;
+	swap.percent = if !f64::is_nan(swap_percent) { swap_percent } else { 0.0 };
+
+	drop(swap);
+}
+
+pub fn extract_storage(sys: &System){
+	let mut storage: MutexGuard<Storage> = GLOBAL_STORAGE.lock().unwrap();
+
+	let mut available_storage: u64 = 0;
+	let mut total_storage: u64 = 0;
+	for disk in sys.disks() {
+		if Disk::mount_point(disk).to_str().unwrap().eq("/") {
+			available_storage += Disk::available_space(disk);
+			total_storage += Disk::total_space(disk);
+			break;
+		}
+	}
+	storage.free = available_storage;
+	storage.total = total_storage;
+	let used_storage: u64 = total_storage - available_storage;
+	storage.used = used_storage;
+
+	let storage_percent: f64 = (used_storage as f64 / total_storage as f64) * 100.0;
+	storage.percent = if !f64::is_nan(storage_percent) { storage_percent } else { 0.0 };
+
+	drop(storage);
+}
+
+pub fn extract_network(sys: &System, interface: &String){
+	let mut network: MutexGuard<Network> = GLOBAL_NETWORK.lock().unwrap();
+
+	for (interface_name, data) in sys.networks(){
+		if interface_name.eq(interface) {
+			network.download = data.received();
+			network.upload = data.transmitted();
+		}
+	}
+
+	drop(network);
+}
 
 pub fn initialize(cache: u64, interface: String, logger: u8){
 	let mut sys: System = System::new_all();
+	GLOBAL_CPU.lock().unwrap().threads = sys.cpus().len();
 
-	unsafe{
-		CACHE = cache;
-		LOGGER = logger;
-		CPU.threads =	sys.cpus().len();
-	}
+	let mut settings: MutexGuard<Settings> = GLOBAL_SETTINGS.lock().unwrap();
+	settings.cache = cache;
+	settings.logger = logger;
+	drop(settings);
 
 	loop {
 		sys.refresh_all();
 
-		unsafe{
-			CPU.min1 = sys.load_average().one;
-			CPU.min5 = sys.load_average().five;
-			CPU.min15 = sys.load_average().fifteen;
+		extract_cpu(&sys);
+		extract_memory(&sys);
+		extract_swap(&sys);
+		extract_storage(&sys);
+		extract_network(&sys, &interface);
 
-			let mut cpu_loads: Vec<f32> = Vec::new();
-			for cpu in sys.cpus(){
-				cpu_loads.push(cpu.cpu_usage());
-			}
-			let cpu_load_sum: f32 = cpu_loads.iter().sum();
-			CPU.percent = cpu_load_sum / cpu_loads.len() as f32;
-
-			MEMORY.total = sys.total_memory();
-			MEMORY.available = sys.available_memory();
-			MEMORY.used = sys.used_memory();
-			MEMORY.free = sys.free_memory();
-
-			let memory_percent: f64 = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
-			MEMORY.percent = if !f64::is_nan(memory_percent) { memory_percent } else { 0.0 };
-
-			SWAP.total = sys.total_swap();
-			SWAP.used = sys.used_swap();
-			SWAP.free = sys.free_swap();
-
-			let swap_percent: f64 = (sys.used_swap() as f64 / sys.total_swap() as f64) * 100.0;
-			SWAP.percent = if !f64::is_nan(swap_percent) { swap_percent } else { 0.0 };
-
-			let mut available_storage: u64 = 0;
-			let mut total_storage: u64 = 0;
-			for disk in sys.disks() {
-				if Disk::mount_point(disk).to_str().unwrap().eq("/") {
-					available_storage += Disk::available_space(disk);
-					total_storage += Disk::total_space(disk);
-					break;
-				}
-			}
-			STORAGE.free = available_storage;
-			STORAGE.total = total_storage;
-			let used_storage: u64 = total_storage - available_storage;
-			STORAGE.used = used_storage;
-
-			let storage_percent: f64 = (used_storage as f64 / total_storage as f64) * 100.0;
-			STORAGE.percent = if !f64::is_nan(storage_percent) { storage_percent } else { 0.0 };
-
-			for (interface_name, data) in sys.networks(){
-				if interface_name.eq(&interface) {
-					NETWORK.download = data.received();
-					NETWORK.upload = data.transmitted();
-				}
-			}
-		}
-
-		std::thread::sleep(std::time::Duration::from_millis(cache * 1000));
+		sleep(Duration::from_millis(cache * 1000));
 	}
 }
 
@@ -148,63 +193,86 @@ pub fn create_metric(mtype: &str, name: &str, description: &str, value: &str) ->
 pub fn create_metrics() -> String{
 	let mut metrics: String = String::from("");
 
-	if(unsafe { LOGGER } >= 1){
-		metrics += &create_metric("gauge", "cpu_load_1min", "CPU load recorded in last minute", unsafe { &CPU.min1.to_string() });
-		metrics += &create_metric("gauge", "cpu_load_5min", "CPU load recorded in last 5 minutes", unsafe { &CPU.min5.to_string() });
-		metrics += &create_metric("gauge", "cpu_load_15min", "CPU load recorded in last 15 minutes", unsafe { &CPU.min15.to_string() });
+	let settings: MutexGuard<Settings> = GLOBAL_SETTINGS.lock().unwrap();
+	let cpu: MutexGuard<Processor> = GLOBAL_CPU.lock().unwrap();
+	let memory: MutexGuard<Memory> = GLOBAL_MEMORY.lock().unwrap();
+	let swap: MutexGuard<Swap> = GLOBAL_SWAP.lock().unwrap();
+	let storage: MutexGuard<Storage> = GLOBAL_STORAGE.lock().unwrap();
+	let network: MutexGuard<Network> = GLOBAL_NETWORK.lock().unwrap();
 
-		metrics += &create_metric("gauge", "memory_total", "Total memory in bytes", unsafe { &MEMORY.total.to_string() });
-		metrics += &create_metric("gauge", "memory_available", "Available memory in bytes", unsafe { &MEMORY.available.to_string() });
-		metrics += &create_metric("gauge", "memory_used", "Used memory in bytes", unsafe { &MEMORY.used.to_string() });
-		metrics += &create_metric("gauge", "memory_free", "Free memory in bytes", unsafe { &MEMORY.free.to_string() });
+	if settings.logger >= 1 {
+		metrics += &create_metric("gauge", "cpu_load_1min", "CPU load recorded in last minute", &cpu.min1.to_string());
+		metrics += &create_metric("gauge", "cpu_load_5min", "CPU load recorded in last 5 minutes", &cpu.min5.to_string());
+		metrics += &create_metric("gauge", "cpu_load_15min", "CPU load recorded in last 15 minutes", &cpu.min15.to_string());
 
-		metrics += &create_metric("gauge", "swap_total", "Total swap storage in bytes", unsafe { &SWAP.total.to_string() });
-		metrics += &create_metric("gauge", "swap_used", "Used swap storage in bytes", unsafe { &SWAP.used.to_string() });
-		metrics += &create_metric("gauge", "swap_free", "Free swap storage in bytes", unsafe { &SWAP.free.to_string() });
+		metrics += &create_metric("gauge", "memory_total", "Total memory in bytes", &memory.total.to_string());
+		metrics += &create_metric("gauge", "memory_available", "Available memory in bytes", &memory.available.to_string());
+		metrics += &create_metric("gauge", "memory_used", "Used memory in bytes", &memory.used.to_string());
+		metrics += &create_metric("gauge", "memory_free", "Free memory in bytes", &memory.free.to_string());
 
-		metrics += &create_metric("gauge", "storage_total", "Total storage in bytes", unsafe { &STORAGE.total.to_string() });
-		metrics += &create_metric("gauge", "storage_used", "Used storage in bytes", unsafe { &STORAGE.used.to_string() });
-		metrics += &create_metric("gauge", "storage_free", "Free storage in bytes", unsafe { &STORAGE.free.to_string() });
+		metrics += &create_metric("gauge", "swap_total", "Total swap storage in bytes", &swap.total.to_string());
+		metrics += &create_metric("gauge", "swap_used", "Used swap storage in bytes", &swap.used.to_string());
+		metrics += &create_metric("gauge", "swap_free", "Free swap storage in bytes", &swap.free.to_string());
+
+		metrics += &create_metric("gauge", "storage_total", "Total storage in bytes", &storage.total.to_string());
+		metrics += &create_metric("gauge", "storage_used", "Used storage in bytes", &storage.used.to_string());
+		metrics += &create_metric("gauge", "storage_free", "Free storage in bytes", &storage.free.to_string());
 	}
-  metrics += &create_metric("gauge", "cpu_load_percent", "CPU load in percent", unsafe { &format!("{:.2}", CPU.percent) });
-	metrics += &create_metric("gauge", "memory_percent", "Used memory in percent", unsafe { &format!("{:.2}", MEMORY.percent) });
-  metrics += &create_metric("gauge", "swap_percent", "Used swap storage in percent", unsafe { &format!("{:.2}", SWAP.percent) });
-  metrics += &create_metric("gauge", "storage_percent", "Used storage in percent", unsafe { &format!("{:.2}", STORAGE.percent) });
-	metrics += &create_metric("gauge", "network_download", "Download speed in bytes", unsafe { &NETWORK.download.to_string() });
-	metrics += &create_metric("gauge", "network_upload", "Upload speed in bytes", unsafe { &NETWORK.upload.to_string() });
+
+  metrics += &create_metric("gauge", "cpu_load_percent", "CPU load in percent", &format!("{:.2}", cpu.percent));
+	metrics += &create_metric("gauge", "memory_percent", "Used memory in percent", &format!("{:.2}", memory.percent));
+  metrics += &create_metric("gauge", "swap_percent", "Used swap storage in percent", &format!("{:.2}", swap.percent));
+  metrics += &create_metric("gauge", "storage_percent", "Used storage in percent", &format!("{:.2}", storage.percent));
+	metrics += &create_metric("gauge", "network_download", "Download speed in bytes", &network.download.to_string());
+	metrics += &create_metric("gauge", "network_upload", "Upload speed in bytes", &network.upload.to_string());
+
+	drop(settings);
+	drop(cpu);
+	drop(memory);
+	drop(swap);
+	drop(storage);
+	drop(network);
+
 	return metrics;
 }
 
 pub fn main_page() -> String{
- return "
- <style>
-	td, th {
-		border-bottom: 1px solid #000;
-		border-right: 1px solid #000;
-		text-align: center;
-		padding: 8px;
-	}
-	</style>
-	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v3.0.0</br>
-	<b>Fetch every:</b> ".to_owned() + unsafe { &CACHE.to_string() } + " seconds</br></br>
-	<table>
-	<tr>
-		<th>CPU Load</th>
-		<td>" + unsafe { &format!("{:.2}", CPU.percent) } + "%</td>
-	</tr>
-	<tr>
-		<th>RAM Usage</th>
-		<td>" + unsafe { &format!("{:.2}", MEMORY.percent) } + "%</td>
-	</tr>
-	<tr>
-		<th>Swap Usage</th>
-		<td>" + unsafe { &format!("{:.2}", SWAP.percent) } + "%</td>
-	</tr>
-	<tr>
-		<th>Storage Usage</th>
-		<td>" + unsafe { &format!("{:.2}", STORAGE.percent) } + "%</td>
-	</tr>
-	</table>
- ";
+
+	let settings: MutexGuard<Settings> = GLOBAL_SETTINGS.lock().unwrap();
+	let cpu: MutexGuard<Processor> = GLOBAL_CPU.lock().unwrap();
+	let memory: MutexGuard<Memory> = GLOBAL_MEMORY.lock().unwrap();
+	let swap: MutexGuard<Swap> = GLOBAL_SWAP.lock().unwrap();
+	let storage: MutexGuard<Storage> = GLOBAL_STORAGE.lock().unwrap();
+
+ 	return "
+	<style>
+		td, th {
+			border-bottom: 1px solid #000;
+			border-right: 1px solid #000;
+			text-align: center;
+			padding: 8px;
+		}
+		</style>
+		<h1>Rabbit Monitor</h1>
+		<b>Version:</b> v3.0.0</br>
+		<b>Fetch every:</b> ".to_owned() + &settings.cache.to_string() + " seconds</br></br>
+		<table>
+		<tr>
+			<th>CPU Load</th>
+			<td>" + &format!("{:.2}", cpu.percent) + "%</td>
+		</tr>
+		<tr>
+			<th>RAM Usage</th>
+			<td>" + &format!("{:.2}", memory.percent) + "%</td>
+		</tr>
+		<tr>
+			<th>Swap Usage</th>
+			<td>" + &format!("{:.2}", swap.percent) + "%</td>
+		</tr>
+		<tr>
+			<th>Storage Usage</th>
+			<td>" + &format!("{:.2}", storage.percent) + "%</td>
+		</tr>
+		</table>
+	";
 }
