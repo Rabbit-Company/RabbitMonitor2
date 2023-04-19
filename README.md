@@ -10,7 +10,7 @@ API Endpoints:
 ```bash
 # Download the binary
 wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v3.0.0/rabbitmonitor
-# Give permissions
+# Set file permissions
 sudo chmod 777 rabbitmonitor
 # Place the binary to `/usr/local/bin`
 sudo mv rabbitmonitor /usr/local/bin
@@ -20,7 +20,7 @@ rabbitmonitor
 
 # Daemonizing (using systemd)
 
-Running Rabbit Monitor in the background is a simple task, just make sure that it runs without errors before doing this. Place the contents below in a file called rabbitmonitor.service in the /etc/systemd/system directory.
+Running Rabbit Monitor in the background is a simple task, just make sure that it runs without errors before doing this. Place the contents below in a file called `rabbitmonitor.service` in the `/etc/systemd/system` directory.
 
 ```service
 [Unit]
