@@ -254,7 +254,7 @@ pub fn main_page() -> String{
 		}
 		</style>
 		<h1>Rabbit Monitor</h1>
-		<b>Version:</b> v3.0.0</br>
+		<b>Version:</b> v3.1.0</br>
 		<b>Fetch every:</b> ".to_owned() + &settings.cache.to_string() + " seconds</br></br>
 		<table>
 		<tr>
