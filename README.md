@@ -45,5 +45,7 @@ systemctl enable --now rabbitmonitor
 
 # Grafana Dashboard
 Rabbit Monitor has a pre-made Grafana dashboard that looks like this:
+
 ![Grafana Dashboard](https://raw.githubusercontent.com/Rabbit-Company/RabbitMonitor2/main/images/1.png)
-It can be installed from official Grafana website: https://grafana.com/grafana/dashboards/18562
+
+It can be installed from official Grafana website: [https://grafana.com/grafana/dashboards/18562](https://grafana.com/grafana/dashboards/18562)
