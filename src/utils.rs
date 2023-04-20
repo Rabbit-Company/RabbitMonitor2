@@ -41,8 +41,8 @@ pub struct Storage {
 }
 
 pub struct Network {
-	download: u64,
-	upload: u64
+	download: f64,
+	upload: f64
 }
 
 static GLOBAL_SETTINGS: Mutex<Settings> = Mutex::new(Settings {
@@ -81,8 +81,8 @@ static GLOBAL_STORAGE: Mutex<Storage> = Mutex::new(Storage {
 });
 
 static GLOBAL_NETWORK: Mutex<Network> = Mutex::new(Network {
-	download: 0,
-	upload: 0
+	download: 0.0,
+	upload: 0.0
 });
 
 pub fn extract_cpu(sys: &System){
@@ -161,8 +161,8 @@ pub fn extract_network(sys: &System, interface: &String, monitoring_time: u64){
 			if millis == 0.0 {
 				millis = 1.0;
 			}
-			network.download = (data.received() as f64 / millis) as u64;
-			network.upload = (data.transmitted() as f64 / millis) as u64;
+			network.download = mega_bits(data.received() as f64 / millis);
+			network.upload = mega_bits(data.transmitted() as f64 / millis);
 		}
 	}
 
@@ -244,9 +244,8 @@ pub fn create_metrics() -> String{
 	return metrics;
 }
 
-pub fn mega_bytes<T: Into<f64>>(bytes: T) -> String{
-	let size = (bytes.into() / 1048576.0) * 8.0;
-	return format!("{:.2}", size) + " Mbps";
+pub fn mega_bits<T: Into<f64>>(bytes: T) -> f64{
+	return (bytes.into() / 1048576.0) * 8.0;
 }
 
 pub fn main_page() -> String{
@@ -296,11 +295,11 @@ pub fn main_page() -> String{
 		</tr>
 		<tr>
 			<th>Download</th>
-			<td>" + &mega_bytes(network.download as f64) + "</td>
+			<td>" + &format!("{:.2}", network.download) + " Mbps</td>
 		</tr>
 		<tr>
 			<th>Upload</th>
-			<td>" + &mega_bytes(network.upload as f64) + "</td>
+			<td>" + &format!("{:.2}", network.upload) + " Mbps</td>
 		</tr>
 		</table>
 		<body>
