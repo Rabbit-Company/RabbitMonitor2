@@ -17,7 +17,7 @@ struct Args {
 	port: u16,
 
 	/// Cache time in seconds
-	#[arg(short, long, default_value_t = 5)]
+	#[arg(short, long, default_value_t = 3)]
 	cache: u64,
 
 	/// Network interface name for monitoring network

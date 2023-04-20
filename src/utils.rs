@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 use std::sync::MutexGuard;
 use std::thread::sleep;
+use std::time::Instant;
 use std::time::Duration;
 use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk, CpuExt};
 
@@ -151,13 +152,17 @@ pub fn extract_storage(sys: &System){
 	drop(storage);
 }
 
-pub fn extract_network(sys: &System, interface: &String){
+pub fn extract_network(sys: &System, interface: &String, monitoring_time: u64){
 	let mut network: MutexGuard<Network> = GLOBAL_NETWORK.lock().unwrap();
 
 	for (interface_name, data) in sys.networks(){
 		if interface_name.eq(interface) {
-			network.download = data.received();
-			network.upload = data.transmitted();
+			let mut millis: f64 = monitoring_time as f64 / 1000.0;
+			if millis == 0.0 {
+				millis = 1.0;
+			}
+			network.download = (data.received() as f64 / millis) as u64;
+			network.upload = (data.transmitted() as f64 / millis) as u64;
 		}
 	}
 
@@ -173,6 +178,8 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 	settings.logger = logger;
 	drop(settings);
 
+	let mut last_refreshed = Instant::now();
+
 	loop {
 		sys.refresh_all();
 
@@ -180,8 +187,9 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 		extract_memory(&sys);
 		extract_swap(&sys);
 		extract_storage(&sys);
-		extract_network(&sys, &interface);
+		extract_network(&sys, &interface, last_refreshed.elapsed().as_millis() as u64);
 
+		last_refreshed = Instant::now();
 		sleep(Duration::from_millis(cache * 1000));
 	}
 }
@@ -236,6 +244,11 @@ pub fn create_metrics() -> String{
 	return metrics;
 }
 
+pub fn mega_bytes<T: Into<f64>>(bytes: T) -> String{
+	let size = (bytes.into() / 1048576.0) * 8.0;
+	return format!("{:.2}", size) + " Mbps";
+}
+
 pub fn main_page() -> String{
 
 	let settings: MutexGuard<Settings> = GLOBAL_SETTINGS.lock().unwrap();
@@ -243,19 +256,27 @@ pub fn main_page() -> String{
 	let memory: MutexGuard<Memory> = GLOBAL_MEMORY.lock().unwrap();
 	let swap: MutexGuard<Swap> = GLOBAL_SWAP.lock().unwrap();
 	let storage: MutexGuard<Storage> = GLOBAL_STORAGE.lock().unwrap();
+	let network: MutexGuard<Network> = GLOBAL_NETWORK.lock().unwrap();
 
  	return "
-	<style>
-		td, th {
-			border-bottom: 1px solid #000;
-			border-right: 1px solid #000;
-			text-align: center;
-			padding: 8px;
-		}
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Rabbit Monitor</title>
+		<meta http-equiv='refresh' content='".to_owned() + &settings.cache.to_string() + "'>
+	</head>
+	<body>
+		<style>
+			td, th {
+				border-bottom: 1px solid #000;
+				border-right: 1px solid #000;
+				text-align: center;
+				padding: 8px;
+			}
 		</style>
 		<h1>Rabbit Monitor</h1>
-		<b>Version:</b> v3.1.0</br>
-		<b>Fetch every:</b> ".to_owned() + &settings.cache.to_string() + " seconds</br></br>
+		<b>Version:</b> v4.0.0</br>
+		<b>Fetch every:</b> " + &settings.cache.to_string() + " seconds</br></br>
 		<table>
 		<tr>
 			<th>CPU Load</th>
@@ -273,6 +294,16 @@ pub fn main_page() -> String{
 			<th>Storage Usage</th>
 			<td>" + &format!("{:.2}", storage.percent) + "%</td>
 		</tr>
+		<tr>
+			<th>Download</th>
+			<td>" + &mega_bytes(network.download as f64) + "</td>
+		</tr>
+		<tr>
+			<th>Upload</th>
+			<td>" + &mega_bytes(network.upload as f64) + "</td>
+		</tr>
 		</table>
+		<body>
+	</html>
 	";
 }
