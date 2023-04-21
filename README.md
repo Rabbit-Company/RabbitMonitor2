@@ -1,6 +1,6 @@
 # RabbitMonitor2
 
-Rabbit Monitor is a simple program written in Rust that collects computer stats every 3 seconds (By default) and create [/metrics](https://openmetrics.io/) API endpoint for other programs like [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/)... to collect and display them.
+Rabbit Monitor is a simple program written in Rust that collects computer stats every 3 seconds (By default) and create [/metrics](https://openmetrics.io/) API endpoint for other programs like [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/)... to collect data and display it.
 
 API Endpoints:
 - [/metrics](https://openmetrics.io/)
