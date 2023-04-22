@@ -31,12 +31,12 @@ struct Args {
 
 #[get("/")]
 fn index() -> content::RawHtml<String> {
-	return content::RawHtml(utils::main_page());
+	content::RawHtml(utils::main_page())
 }
 
 #[get("/metrics")]
 fn metrics() -> String {
-	return utils::create_metrics();
+	utils::create_metrics()
 }
 
 #[launch]

@@ -178,7 +178,7 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 	settings.logger = logger;
 	drop(settings);
 
-	let mut last_refreshed = Instant::now();
+	let mut last_refreshed: Instant = Instant::now();
 
 	loop {
 		sys.refresh_all();
@@ -195,7 +195,7 @@ pub fn initialize(cache: u64, interface: String, logger: u8){
 }
 
 pub fn create_metric(mtype: &str, name: &str, description: &str, value: &str) -> String{
-	return "# HELP rabbit_".to_owned() + name + " " + description + "\n# TYPE rabbit_" + name + " " + mtype + "\nrabbit_" + name + " " + value + "\n";
+	"# HELP rabbit_".to_owned() + name + " " + description + "\n# TYPE rabbit_" + name + " " + mtype + "\nrabbit_" + name + " " + value + "\n"
 }
 
 pub fn create_metrics() -> String{
@@ -241,11 +241,11 @@ pub fn create_metrics() -> String{
 	drop(storage);
 	drop(network);
 
-	return metrics;
+	metrics
 }
 
 pub fn mega_bits<T: Into<f64>>(bytes: T) -> f64{
-	return (bytes.into() / 1048576.0) * 8.0;
+	(bytes.into() / 1048576.0) * 8.0
 }
 
 pub fn main_page() -> String{
@@ -257,8 +257,7 @@ pub fn main_page() -> String{
 	let storage: MutexGuard<Storage> = GLOBAL_STORAGE.lock().unwrap();
 	let network: MutexGuard<Network> = GLOBAL_NETWORK.lock().unwrap();
 
- 	return "
-	<!DOCTYPE html>
+	"<!DOCTYPE html>
 	<html>
 	<head>
 		<title>Rabbit Monitor</title>
@@ -303,6 +302,5 @@ pub fn main_page() -> String{
 		</tr>
 		</table>
 		<body>
-	</html>
-	";
+	</html>"
 }
