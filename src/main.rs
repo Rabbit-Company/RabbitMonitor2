@@ -1,8 +1,12 @@
-#[macro_use] extern crate rocket;
-use rocket::response::content;
+use axum::extract::State;
+use monitor::Monitor;
 use clap::Parser;
+use std::{thread::sleep, time::Duration};
+use std::sync::{Arc, Mutex, MutexGuard};
+use axum::{routing::get,Router, response::Html};
 
 pub mod utils;
+pub mod monitor;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -29,30 +33,42 @@ struct Args {
 	logger: u8,
 }
 
-#[get("/")]
-fn index() -> content::RawHtml<String> {
-	content::RawHtml(utils::main_page())
-}
-
-#[get("/metrics")]
-fn metrics() -> String {
-	utils::create_metrics()
-}
-
-#[launch]
-fn rocket() -> _ {
+#[tokio::main]
+async fn main() {
 
 	let args: Args = Args::parse();
+	let monitor: Arc<Mutex<Monitor>> = Arc::new(Mutex::new(Monitor::new()));
+	let cloned: Arc<Mutex<Monitor>> = monitor.clone();
 
 	std::thread::spawn(move || {
-		utils::initialize(args.cache, args.interface, args.logger);
+		{
+			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
+			temp.settings.cache = args.cache;
+			temp.settings.interface = args.interface;
+			temp.settings.logger = args.logger;
+		}
+
+		loop{
+			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
+			temp.refresh();
+			drop(temp);
+			sleep(Duration::from_secs(args.cache));
+		}
 	});
 
-	let figment: rocket::figment::Figment = rocket::Config::figment()
-		.merge(("address", args.address))
-		.merge(("port", args.port));
+	let app: Router<_, _> = Router::new()
+		.route("/", get(index))
+		.route("/metrics", get(metrics))
+		.with_state(cloned);
 
-	rocket::custom(figment)
-		.mount("/", routes![index])
-		.mount("/", routes![metrics])
+	let address: String = args.address + ":" + &args.port.to_string();
+	axum::Server::bind(&address.parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+}
+
+async fn index(State(state): State<Arc<Mutex<Monitor>>>) -> Html<String>{
+	Html(utils::main_page(state))
+}
+
+async fn metrics(State(state): State<Arc<Mutex<Monitor>>>) -> Html<String>{
+	Html(utils::create_metrics(state))
 }
