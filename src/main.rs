@@ -49,10 +49,11 @@ async fn main() {
 		}
 
 		loop{
-			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
-			temp.refresh();
-			drop(temp);
-			sleep(Duration::from_secs(args.cache));
+			{
+				let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
+				temp.refresh();
+			}
+			sleep(Duration::from_millis(args.cache * 1000));
 		}
 	});
 

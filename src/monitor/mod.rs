@@ -32,13 +32,14 @@ impl Monitor{
 
 	pub fn refresh(&mut self){
 		self.system.refresh_all();
-		self.refreshed = Instant::now();
 
 		self.cpu();
 		self.memory();
 		self.swap();
 		self.storage();
 		self.network();
+
+		self.refreshed = Instant::now();
 	}
 
 	pub fn cpu(&mut self){
