@@ -63,6 +63,7 @@ async fn main() {
 		.with_state(cloned);
 
 	let address: String = args.address + ":" + &args.port.to_string();
+	println!("Rabbit Monitor listening on {}", &address);
 	axum::Server::bind(&address.parse().unwrap()).serve(app.into_make_service()).await.unwrap();
 }
 
