@@ -1,4 +1,3 @@
-#[derive(Clone)]
 pub struct Memory {
 	pub total: u64,
 	pub available: u64,

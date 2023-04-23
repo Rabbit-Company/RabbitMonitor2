@@ -1,4 +1,3 @@
-#[derive(Clone)]
 pub struct Processor {
 	pub min1: f64,
 	pub min5: f64,

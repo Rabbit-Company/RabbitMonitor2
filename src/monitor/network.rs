@@ -1,4 +1,3 @@
-#[derive(Clone)]
 pub struct Network {
 	pub download: f64,
 	pub upload: f64

@@ -1,4 +1,3 @@
-#[derive(Clone)]
 pub struct Settings {
 	pub cache: u64,
 	pub logger: u8,

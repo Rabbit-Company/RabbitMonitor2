@@ -1,4 +1,3 @@
-#[derive(Clone)]
 pub struct Swap {
 	pub total: u64,
 	pub used: u64,
