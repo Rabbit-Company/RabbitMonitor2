@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #note port is set to 8088 
-
+port=8088
 # Download the binary
 wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v4.1.0/rabbitmonitor
 
