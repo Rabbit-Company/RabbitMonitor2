@@ -1,19 +1,20 @@
 [package]
 name = "rabbitmonitor"
-version = "4.1.0"
+version = "5.0.0"
 authors = ["Rabbit Company LLC <info@rabbit-company.com>"]
 description = "Simple server monitor"
 edition = "2021"
 repository = "https://github.com/Rabbit-Company/RabbitMonitor2"
 license = "GPL-3.0"
 readme = "README.md"
-rust-version = "1.68.2"
+rust-version = "1.85.1"
 categories = ["command-line-utilities"]
 keywords = ["cli", "process-monitoring"]
 publish = ["rabbitmonitor"]
 
 [dependencies]
-axum = "0.6.16"
-tokio = { version = "1.27.0", features = ["full"] }
-clap = { version = "4.2.4", features = ["derive"] }
-sysinfo = "0.28.4"
+axum = "0.8.1"
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+tokio = { version = "1.44.1", features = ["full"] }
+clap = { version = "4.5.32", features = ["derive"] }
+sysinfo = "0.33.1"

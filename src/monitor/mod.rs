@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use sysinfo::{NetworkExt, System, SystemExt, DiskExt, Disk, CpuExt};
+use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
 
 use crate::utils::mega_bits;
 
@@ -15,6 +15,8 @@ pub mod network;
 
 pub struct Monitor{
 	pub system: System,
+	pub disks: Disks,
+	pub networks: Networks,
 	pub settings: Settings,
 	pub processor: Processor,
 	pub memory: Memory,
@@ -27,12 +29,16 @@ pub struct Monitor{
 impl Monitor{
 
 	pub fn new() -> Self{
-		Monitor {system: System::new_all(), settings: Settings::new(), processor: Processor::new(), memory: Memory::new(), swap: Swap::new(), storage: Storage::new(), network: Network::new(), refreshed: Instant::now() }
+		let mut sys = System::new_all();
+		sys.refresh_all();
+
+		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage());
+		let networks = Networks::new_with_refreshed_list();
+
+		Monitor {system: sys, disks, networks, settings: Settings::new(), processor: Processor::new(), memory: Memory::new(), swap: Swap::new(), storage: Storage::new(), network: Network::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
-		self.system.refresh_all();
-
 		self.cpu();
 		self.memory();
 		self.swap();
@@ -43,19 +49,17 @@ impl Monitor{
 	}
 
 	pub fn cpu(&mut self){
-		self.processor.min1 = self.system.load_average().one;
-		self.processor.min5 = self.system.load_average().five;
-		self.processor.min15 = self.system.load_average().fifteen;
+		let load_average = System::load_average();
+		self.processor.min1 = load_average.one;
+		self.processor.min5 = load_average.five;
+		self.processor.min15 = load_average.fifteen;
 
-		let mut cpu_loads: Vec<f32> = Vec::new();
-		for cpu in self.system.cpus() {
-			cpu_loads.push(cpu.cpu_usage());
-		}
-		let cpu_load_sum: f32 = cpu_loads.iter().sum();
-		self.processor.percent = cpu_load_sum / cpu_loads.len() as f32;
+		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage());
+		self.processor.percent = self.system.global_cpu_usage();
 	}
 
 	pub fn memory(&mut self){
+		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 		self.memory.total = self.system.total_memory();
 		self.memory.available = self.system.available_memory();
 		self.memory.used = self.system.used_memory();
@@ -66,6 +70,7 @@ impl Monitor{
 	}
 
 	pub fn swap(&mut self){
+		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_swap());
 		self.swap.total = self.system.total_swap();
 		self.swap.used = self.system.used_swap();
 		self.swap.free = self.system.free_swap();
@@ -78,10 +83,11 @@ impl Monitor{
 		let mut available_storage: u64 = 0;
 		let mut total_storage: u64 = 0;
 
-		for disk in self.system.disks() {
-			if Disk::mount_point(disk).to_str().unwrap() == "/" {
-				available_storage += Disk::available_space(disk);
-				total_storage += Disk::total_space(disk);
+		self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage());
+		for disk in self.disks.list() {
+			if disk.mount_point().to_str().unwrap() == "/" {
+				available_storage += disk.available_space();
+				total_storage += disk.total_space();
 				break;
 			}
 		}
@@ -98,14 +104,15 @@ impl Monitor{
 
 	pub fn network(&mut self){
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
-		for (interface_name, data) in self.system.networks() {
-			if interface_name == &self.settings.interface {
-				let mut millis: f64 = monitoring_time as f64 / 1000.0;
-				if millis == 0.0 { millis = 1.0 }
+		self.networks.refresh(true);
 
-				self.network.download = mega_bits(data.received() as f64 / millis);
-				self.network.upload = mega_bits(data.transmitted() as f64 / millis);
-			}
+		let network = self.networks.get(&self.settings.interface);
+		if let Some(network) = network {
+			let mut millis: f64 = monitoring_time as f64 / 1000.0;
+			if millis == 0.0 { millis = 1.0 }
+
+			self.network.download = mega_bits(network.received() as f64 / millis);
+			self.network.upload = mega_bits(network.transmitted() as f64 / millis);
 		}
 	}
 
