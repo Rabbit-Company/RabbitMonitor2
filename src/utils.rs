@@ -62,7 +62,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String{
 			}
 		</style>
 		<h1>Rabbit Monitor</h1>
-		<b>Version:</b> v5.0.0</br>
+		<b>Version:</b> v5.1.0</br>
 		<b>Fetch every:</b> " + &temp.settings.cache.to_string() + " seconds</br></br>
 		<table>
 		<tr>

@@ -80,9 +80,13 @@ async fn main() {
 }
 
 async fn index(
-	State((state, _)): State<(Arc<Mutex<Monitor>>, Option<String>)>
-) -> Html<String> {
-	Html(utils::main_page(state))
+	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
+) -> impl IntoResponse {
+	if token.is_some() {
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v5.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+	}
+
+	Html(utils::main_page(state)).into_response()
 }
 
 async fn metrics(
@@ -95,7 +99,7 @@ async fn metrics(
 				return Html(utils::create_metrics(state)).into_response();
 			}
 		}
-		return (StatusCode::UNAUTHORIZED, "Invalid or missing token").into_response();
+		return (StatusCode::UNAUTHORIZED, "Unauthorized: A valid Bearer token is required to access this endpoint.").into_response();
 	}
 
 	Html(utils::create_metrics(state)).into_response()
