@@ -83,7 +83,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v5.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v6.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

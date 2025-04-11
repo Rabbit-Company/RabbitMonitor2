@@ -32,7 +32,7 @@ impl Monitor{
 		let mut sys = System::new_all();
 		sys.refresh_all();
 
-		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage());
+		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage().with_io_usage());
 		let networks = Networks::new_with_refreshed_list();
 
 		Monitor {system: sys, disks, networks, settings: Settings::new(), processor: Processor::new(), memory: Memory::new(), swap: Swap::new(), storage: Storage::new(), network: Network::new(), refreshed: Instant::now() }
@@ -82,17 +82,33 @@ impl Monitor{
 	pub fn storage(&mut self){
 		let mut available_storage: u64 = 0;
 		let mut total_storage: u64 = 0;
+		let mut total_read_bytes: u64 = 0;
+    let mut total_written_bytes: u64 = 0;
 
-		self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage());
+		self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage().with_io_usage());
 		for disk in self.disks.list() {
 			if disk.mount_point().to_str().unwrap() == "/" {
 				available_storage += disk.available_space();
 				total_storage += disk.total_space();
+				total_read_bytes += disk.usage().total_read_bytes;
+				total_written_bytes += disk.usage().total_written_bytes;
 				break;
 			}
 		}
 
 		let used_storage: u64 = total_storage - available_storage;
+
+		let elapsed = self.refreshed.elapsed().as_secs_f64();
+		if self.storage.total_read_bytes > 0 && self.storage.total_written_bytes > 0 && elapsed > 0.0 {
+			self.storage.read_speed = (total_read_bytes - self.storage.total_read_bytes) as f64 / elapsed;
+			self.storage.write_speed = (total_written_bytes - self.storage.total_written_bytes) as f64 / elapsed;
+		} else {
+			self.storage.read_speed = 0.0;
+			self.storage.write_speed = 0.0;
+		}
+
+		self.storage.total_read_bytes = total_read_bytes;
+    self.storage.total_written_bytes = total_written_bytes;
 
 		self.storage.free = available_storage;
 		self.storage.total = total_storage;

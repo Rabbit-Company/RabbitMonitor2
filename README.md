@@ -23,11 +23,11 @@ Available options:
 
 ```bash
 # Download the binary
-wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v5.1.0/rabbitmonitor
+wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v6.0.0/rabbitmonitor-x86_64-gnu
 # Set file permissions
-sudo chmod 777 rabbitmonitor
+sudo chmod 777 rabbitmonitor-x86_64-gnu
 # Place the binary to `/usr/local/bin`
-sudo mv rabbitmonitor /usr/local/bin
+sudo mv rabbitmonitor-x86_64-gnu /usr/local/bin/rabbitmonitor
 # Start the monitor
 rabbitmonitor
 ```
@@ -66,9 +66,9 @@ systemctl enable --now rabbitmonitor
 systemctl stop rabbitmonitor
 
 # Download Rabbit Monitor
-wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v5.1.0/rabbitmonitor
-sudo chmod 777 rabbitmonitor
-sudo mv rabbitmonitor /usr/local/bin
+wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/download/v6.0.0/rabbitmonitor-x86_64-gnu
+sudo chmod 777 rabbitmonitor-x86_64-gnu
+sudo mv rabbitmonitor-x86_64-gnu /usr/local/bin/rabbitmonitor
 
 # Start service
 systemctl start rabbitmonitor

@@ -6,6 +6,10 @@ pub fn mega_bits<T: Into<f64>>(bytes: T) -> f64{
 	(bytes.into() / 1048576.0) * 8.0
 }
 
+pub fn format_bytes_per_sec(bytes: f64) -> String {
+	format!("{:.2}", bytes / (1024.0 * 1024.0))
+}
+
 fn create_metric(name: impl Display, description: impl Display, value: impl Display) -> String {
   format!("# HELP rabbit_{name} {description}\n# TYPE rabbit_{name} gauge\nrabbit_{name} {value}\n")
 }
@@ -38,8 +42,10 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 		metrics += &create_metric("memory_percent", "Used memory in percent", format!("{:.2}", temp.memory.percent));
 		metrics += &create_metric("swap_percent", "Used swap storage in percent", format!("{:.2}", temp.swap.percent));
 		metrics += &create_metric("storage_percent", "Used storage in percent", format!("{:.2}", temp.storage.percent));
-		metrics += &create_metric("network_download", "Download speed in bytes", temp.network.download.to_string());
-		metrics += &create_metric("network_upload", "Upload speed in bytes", temp.network.upload.to_string());
+		metrics += &create_metric("storage_read_speed", "Disk read speed in bytes/sec", temp.storage.read_speed.to_string());
+		metrics += &create_metric("storage_write_speed", "Disk write speed in bytes/sec", temp.storage.write_speed.to_string());
+		metrics += &create_metric("network_download_speed", "Download speed in bytes/sec", temp.network.download.to_string());
+		metrics += &create_metric("network_upload_speed", "Upload speed in bytes/sec", temp.network.upload.to_string());
 	}
 	metrics
 }
@@ -62,7 +68,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String{
 			}
 		</style>
 		<h1>Rabbit Monitor</h1>
-		<b>Version:</b> v5.1.0</br>
+		<b>Version:</b> v6.0.0</br>
 		<b>Fetch every:</b> " + &temp.settings.cache.to_string() + " seconds</br></br>
 		<table>
 		<tr>
@@ -82,11 +88,19 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String{
 			<td>" + &format!("{:.2}", temp.storage.percent) + "%</td>
 		</tr>
 		<tr>
-			<th>Download</th>
+			<th>Read Speed</th>
+			<td>" + &format_bytes_per_sec(temp.storage.read_speed) + " MB/s</td>
+		</tr>
+		<tr>
+			<th>Write Speed</th>
+			<td>" + &format_bytes_per_sec(temp.storage.write_speed) + " MB/s</td>
+		</tr>
+		<tr>
+			<th>Download Speed</th>
 			<td>" + &format!("{:.2}", temp.network.download) + " Mbps</td>
 		</tr>
 		<tr>
-			<th>Upload</th>
+			<th>Upload Speed</th>
 			<td>" + &format!("{:.2}", temp.network.upload) + " Mbps</td>
 		</tr>
 		</table>
