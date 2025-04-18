@@ -1,9 +1,7 @@
-use std::time::Instant;
-
+use std::time::{Duration, Instant};
+use std::time::{SystemTime, UNIX_EPOCH};
 use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
-
 use crate::utils::mega_bits;
-
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
 
 pub mod settings;
@@ -39,16 +37,18 @@ impl Monitor{
 	}
 
 	pub fn refresh(&mut self){
-		self.cpu();
-		self.memory();
-		self.swap();
-		self.storage();
-		self.network();
+		let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+		self.cpu(now);
+		self.memory(now);
+		self.swap(now);
+		self.storage(now);
+		self.network(now);
 
 		self.refreshed = Instant::now();
 	}
 
-	pub fn cpu(&mut self){
+	pub fn cpu(&mut self, now: Duration){
 		let load_average = System::load_average();
 		self.processor.min1 = load_average.one;
 		self.processor.min5 = load_average.five;
@@ -56,9 +56,11 @@ impl Monitor{
 
 		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage());
 		self.processor.percent = self.system.global_cpu_usage();
+
+		self.processor.refreshed = now;
 	}
 
-	pub fn memory(&mut self){
+	pub fn memory(&mut self, now: Duration){
 		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 		self.memory.total = self.system.total_memory();
 		self.memory.available = self.system.available_memory();
@@ -67,9 +69,11 @@ impl Monitor{
 
 		let memory_percent: f64 = (self.system.used_memory() as f64 / self.system.total_memory() as f64) * 100.0;
 		self.memory.percent = if !f64::is_nan(memory_percent) { memory_percent } else { 0.0 };
+
+		self.memory.refreshed = now;
 	}
 
-	pub fn swap(&mut self){
+	pub fn swap(&mut self, now: Duration){
 		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_swap());
 		self.swap.total = self.system.total_swap();
 		self.swap.used = self.system.used_swap();
@@ -77,9 +81,11 @@ impl Monitor{
 
 		let swap_percent: f64 = (self.system.used_swap() as f64 / self.system.total_swap() as f64) * 100.0;
 		self.swap.percent = if !f64::is_nan(swap_percent) { swap_percent } else { 0.0 };
+
+		self.swap.refreshed = now;
 	}
 
-	pub fn storage(&mut self){
+	pub fn storage(&mut self, now: Duration){
 		let mut available_storage: u64 = 0;
 		let mut total_storage: u64 = 0;
 		let mut total_read_bytes: u64 = 0;
@@ -116,9 +122,11 @@ impl Monitor{
 
 		let storage_percent: f64 = (used_storage as f64 / total_storage as f64) * 100.0;
 		self.storage.percent = if !f64::is_nan(storage_percent) { storage_percent }else{ 0.0 };
+
+		self.storage.refreshed = now;
 	}
 
-	pub fn network(&mut self){
+	pub fn network(&mut self, now: Duration){
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
 		self.networks.refresh(true);
 
@@ -130,6 +138,8 @@ impl Monitor{
 			self.network.download = mega_bits(network.received() as f64 / millis);
 			self.network.upload = mega_bits(network.transmitted() as f64 / millis);
 		}
+
+		self.network.refreshed = now;
 	}
 
 }

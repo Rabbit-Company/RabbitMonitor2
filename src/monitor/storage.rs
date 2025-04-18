@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 pub struct Storage {
 	pub total: u64,
 	pub used: u64,
@@ -7,6 +9,7 @@ pub struct Storage {
 	pub total_written_bytes: u64,
 	pub read_speed: f64,
 	pub write_speed: f64,
+	pub refreshed: Duration,
 }
 
 impl Storage {
@@ -21,6 +24,7 @@ impl Storage {
 			total_written_bytes: 0,
 			read_speed: 0.0,
 			write_speed: 0.0,
+			refreshed: Duration::from_secs(0),
 		}
 	}
 

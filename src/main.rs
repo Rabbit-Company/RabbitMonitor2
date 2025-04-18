@@ -1,7 +1,7 @@
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{response::Html, routing::get, Router};
+use axum::http::{StatusCode, header, HeaderValue};
 use axum_extra::headers::{authorization::Bearer, Authorization};
 use axum_extra::TypedHeader;
 use clap::Parser;
@@ -83,7 +83,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v6.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v6.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()
@@ -96,11 +96,21 @@ async fn metrics(
 	if let Some(token) = &token {
 		if let Some(TypedHeader(auth)) = auth {
 			if auth.token() == token {
-				return Html(utils::create_metrics(state)).into_response();
+				let body = utils::create_metrics(state);
+				return (
+					StatusCode::OK,
+					[(header::CONTENT_TYPE, HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"))],
+					body,
+				).into_response();
 			}
 		}
 		return (StatusCode::UNAUTHORIZED, "Unauthorized: A valid Bearer token is required to access this endpoint.").into_response();
 	}
 
-	Html(utils::create_metrics(state)).into_response()
+	let body = utils::create_metrics(state);
+	(
+		StatusCode::OK,
+		[(header::CONTENT_TYPE, HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"))],
+		body,
+	).into_response()
 }
