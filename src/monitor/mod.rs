@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
+use system_info::SystemInfo;
 use crate::utils::mega_bits;
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
 
 pub mod settings;
+pub mod system_info;
 pub mod processor;
 pub mod memory;
 pub mod swap;
@@ -16,11 +19,12 @@ pub struct Monitor{
 	pub disks: Disks,
 	pub networks: Networks,
 	pub settings: Settings,
+	pub system_info: SystemInfo,
 	pub processor: Processor,
 	pub memory: Memory,
 	pub swap: Swap,
-	pub storage: Storage,
-	pub network: Network,
+	pub storage_devices: HashMap<String, Storage>,
+	pub network_interfaces: HashMap<String, Network>,
 	pub refreshed: Instant
 }
 
@@ -33,7 +37,21 @@ impl Monitor{
 		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage().with_io_usage());
 		let networks = Networks::new_with_refreshed_list();
 
-		Monitor {system: sys, disks, networks, settings: Settings::new(), processor: Processor::new(), memory: Memory::new(), swap: Swap::new(), storage: Storage::new(), network: Network::new(), refreshed: Instant::now() }
+		let system_info = SystemInfo {
+			name: System::name().unwrap_or("unknown".to_string()),
+			kernel_version: System::kernel_version().unwrap_or("unknown".to_string()),
+			os_version: System::os_version().unwrap_or("unknown".to_string()),
+			long_os_version: System::long_os_version().unwrap_or("unknown".to_string()),
+			distribution_id: System::distribution_id(),
+			host_name: System::host_name().unwrap_or("unknown".to_string()),
+			boot_time: System::boot_time(),
+		};
+
+		let mut processor = Processor::new();
+		processor.arch = System::cpu_arch();
+		processor.threads = sys.cpus().len() as u64;
+
+		Monitor {system: sys, disks, networks, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
@@ -86,60 +104,65 @@ impl Monitor{
 	}
 
 	pub fn storage(&mut self, now: Duration){
-		let mut available_storage: u64 = 0;
-		let mut total_storage: u64 = 0;
-		let mut total_read_bytes: u64 = 0;
-    let mut total_written_bytes: u64 = 0;
-
+		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
 		self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage().with_io_usage());
+
+		let mut millis: f64 = monitoring_time as f64 / 1000.0;
+		if millis == 0.0 {
+			millis = 1.0;
+		}
+
 		for disk in self.disks.list() {
-			if disk.mount_point().to_str().unwrap() == "/" {
-				available_storage += disk.available_space();
-				total_storage += disk.total_space();
-				total_read_bytes += disk.usage().total_read_bytes;
-				total_written_bytes += disk.usage().total_written_bytes;
-				break;
-			}
+			let name = disk.name().to_string_lossy().to_string();
+			let mount = disk.mount_point().to_string_lossy().to_string();
+			let total = disk.total_space();
+			let free = disk.available_space();
+			let used = total - free;
+			let usage = disk.usage();
+
+			let mut percent: f64 = (used as f64 / total as f64) * 100.0;
+			percent = if !f64::is_nan(percent) { percent }else{ 0.0 };
+
+			self.storage_devices.insert(name.clone(), Storage {
+				name,
+				mount_point: mount,
+				total,
+				used,
+				free,
+				percent,
+				read_speed: usage.read_bytes as f64 / millis,
+				write_speed: usage.written_bytes as f64 / millis,
+				total_read_bytes: usage.total_read_bytes,
+				total_written_bytes: usage.total_written_bytes,
+				refreshed: now,
+			});
 		}
-
-		let used_storage: u64 = total_storage - available_storage;
-
-		let elapsed = self.refreshed.elapsed().as_secs_f64();
-		if self.storage.total_read_bytes > 0 && self.storage.total_written_bytes > 0 && elapsed > 0.0 {
-			self.storage.read_speed = (total_read_bytes - self.storage.total_read_bytes) as f64 / elapsed;
-			self.storage.write_speed = (total_written_bytes - self.storage.total_written_bytes) as f64 / elapsed;
-		} else {
-			self.storage.read_speed = 0.0;
-			self.storage.write_speed = 0.0;
-		}
-
-		self.storage.total_read_bytes = total_read_bytes;
-    self.storage.total_written_bytes = total_written_bytes;
-
-		self.storage.free = available_storage;
-		self.storage.total = total_storage;
-		self.storage.used = used_storage;
-
-		let storage_percent: f64 = (used_storage as f64 / total_storage as f64) * 100.0;
-		self.storage.percent = if !f64::is_nan(storage_percent) { storage_percent }else{ 0.0 };
-
-		self.storage.refreshed = now;
 	}
 
 	pub fn network(&mut self, now: Duration){
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
 		self.networks.refresh(true);
 
-		let network = self.networks.get(&self.settings.interface);
-		if let Some(network) = network {
-			let mut millis: f64 = monitoring_time as f64 / 1000.0;
-			if millis == 0.0 { millis = 1.0 }
-
-			self.network.download = mega_bits(network.received() as f64 / millis);
-			self.network.upload = mega_bits(network.transmitted() as f64 / millis);
+		let mut millis: f64 = monitoring_time as f64 / 1000.0;
+		if millis == 0.0 {
+			millis = 1.0;
 		}
 
-		self.network.refreshed = now;
+		for iface in &self.settings.interfaces {
+			if let Some(network) = self.networks.get(iface) {
+				let download = mega_bits(network.received() as f64 / millis);
+				let upload = mega_bits(network.transmitted() as f64 / millis);
+				self.network_interfaces.insert(iface.clone(), Network {
+					download,
+					upload,
+					total_errors_on_received: network.total_errors_on_received(),
+					total_errors_on_transmitted: network.total_errors_on_transmitted(),
+					total_packets_received: network.total_packets_received(),
+					total_packets_transmitted: network.total_packets_transmitted(),
+					refreshed: now
+				});
+			}
+		}
 	}
 
 }

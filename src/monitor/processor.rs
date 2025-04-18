@@ -5,6 +5,8 @@ pub struct Processor {
 	pub min5: f64,
 	pub min15: f64,
 	pub percent: f32,
+	pub threads: u64,
+	pub arch: String,
 	pub refreshed: Duration,
 }
 
@@ -16,6 +18,8 @@ impl Processor {
 			min5: 0.0,
 			min15: 0.0,
 			percent: 0.0,
+			threads: 0,
+			arch: String::new(),
 			refreshed: Duration::from_secs(0),
 		}
 	}

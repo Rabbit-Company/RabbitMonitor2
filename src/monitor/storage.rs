@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 pub struct Storage {
+	pub name: String,
+	pub mount_point: String,
 	pub total: u64,
 	pub used: u64,
 	pub free: u64,
@@ -16,6 +18,8 @@ impl Storage {
 
 	pub fn new() -> Self{
 		Storage {
+			name: "".to_string(),
+			mount_point: "/".to_string(),
 			total: 0,
 			used: 0,
 			free: 0,

@@ -9,14 +9,18 @@ API Endpoints:
 Available options:
 
 ```
-  -a, --address <ADDRESS>      Bind the server to specific address [default: 0.0.0.0]
-  -p, --port <PORT>            Bind the server to specific port [default: 8088]
-  -c, --cache <CACHE>          Cache time in seconds [default: 3]
-  -i, --interface <INTERFACE>  Network interface name for monitoring network [default: eth0]
-  -l, --logger <LOGGER>        Logger level [default: 1]
-  -t, --token <TOKEN>          Bearer token for authentication (optional)
-  -h, --help                   Print help
-  -V, --version                Print version
+  -a, --address <ADDRESS>        Bind the server to specific address [default: 0.0.0.0]
+  -p, --port <PORT>              Bind the server to specific port [default: 8088]
+  -c, --cache <CACHE>            Cache time in seconds [default: 3]
+  -t, --token <TOKEN>            Bearer token for authentication (optional)
+      --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
+      --cpu-details              Enable detailed CPU metrics
+      --memory-details           Enable detailed memory metrics
+      --swap-details             Enable detailed swap metrics
+      --storage-details          Enable detailed storage metrics
+      --network-details          Enable detailed network metrics
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
 # Installation

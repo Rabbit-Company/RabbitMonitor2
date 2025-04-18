@@ -1,7 +1,12 @@
 pub struct Settings {
 	pub cache: u64,
-	pub logger: u8,
-	pub interface: String,
+	pub interfaces: Vec<String>,
+	pub disks: Vec<String>,
+	pub cpu_details: bool,
+	pub memory_details: bool,
+	pub swap_details: bool,
+	pub storage_details: bool,
+	pub network_details: bool,
 }
 
 impl Settings {
@@ -9,8 +14,13 @@ impl Settings {
 	pub fn new() -> Self{
 		Settings {
 			cache: 3,
-			logger: 1,
-			interface: "eth0".to_string()
+			interfaces: Vec::new(),
+			disks: Vec::new(),
+			cpu_details: false,
+			memory_details: false,
+			swap_details: false,
+			storage_details: false,
+			network_details: false,
 		}
 	}
 

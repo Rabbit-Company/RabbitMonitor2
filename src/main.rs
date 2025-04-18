@@ -27,17 +27,33 @@ pub mod utils;
 	#[arg(short, long, default_value_t = 3)]
 	cache: u64,
 
-	/// Network interface name for monitoring network
-	#[arg(short, long, default_value_t = String::from("eth0"))]
-	interface: String,
-
-	/// Logger level
-	#[arg(short, long, default_value_t = 1)]
-	logger: u8,
-
 	/// Bearer token for authentication (optional)
 	#[arg(short, long)]
 	token: Option<String>,
+
+	/// Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
+	#[arg(long, value_delimiter = ',')]
+	interfaces: Vec<String>,
+
+	/// Enable detailed CPU metrics
+	#[arg(long, default_value_t = false)]
+	cpu_details: bool,
+
+	/// Enable detailed memory metrics
+	#[arg(long, default_value_t = false)]
+	memory_details: bool,
+
+	/// Enable detailed swap metrics
+	#[arg(long, default_value_t = false)]
+	swap_details: bool,
+
+	/// Enable detailed storage metrics
+	#[arg(long, default_value_t = false)]
+	storage_details: bool,
+
+	/// Enable detailed network metrics
+	#[arg(long, default_value_t = false)]
+	network_details: bool,
 }
 
 #[tokio::main]
@@ -51,8 +67,12 @@ async fn main() {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
-			temp.settings.interface = args.interface;
-			temp.settings.logger = args.logger;
+			temp.settings.interfaces = args.interfaces;
+			temp.settings.cpu_details = args.cpu_details;
+			temp.settings.memory_details = args.memory_details;
+			temp.settings.swap_details = args.swap_details;
+			temp.settings.storage_details = args.storage_details;
+			temp.settings.network_details = args.network_details;
 		}
 
 		loop {
@@ -83,7 +103,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v6.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()
