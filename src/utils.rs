@@ -36,7 +36,7 @@ fn create_info_metric(name: &str, description: &str, labels: &[(&str, &str)]) ->
 	let header = create_metric_header(name, description, "info", None);
 	let labels_str = parse_labels(labels);
 
-	format!("{header}rabbit_{name}{{{labels_str}}} 1\n")
+	format!("{header}rabbit_{name}{labels_str} 1\n")
 }
 
 fn create_gauge_metric(name: &str, description: &str, value: &str, unit: Option<&str>, labels: &[(&str, &str)], timestamp: Duration) -> String {
@@ -77,7 +77,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 	{
 		let temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 
-		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.0.0")]);
+		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.0.1")]);
 		metrics += &create_info_metric("system_info", "System information", &[
 			("name", &temp.system_info.name),
 			("kernel_version", &temp.system_info.kernel_version),
@@ -204,7 +204,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v7.0.0</br>
+	<b>Version:</b> v7.0.1</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>
