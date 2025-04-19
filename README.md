@@ -49,7 +49,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=rabbitmonitor --all-metrics
+ExecStart=rabbitmonitor --interfaces eth0 --all-metrics
 TimeoutStartSec=0
 TimeoutStopSec=2
 RemainAfterExit=yes
