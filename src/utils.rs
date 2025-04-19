@@ -94,7 +94,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 	{
 		let temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 
-		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.0.2")]);
+		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.1.0")]);
 		metrics += &create_info_metric("system_info", "System information", &[
 			("name", &temp.system_info.name),
 			("kernel_version", &temp.system_info.kernel_version),
@@ -106,20 +106,20 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 		]);
 		metrics += &create_info_metric("cpu_info", "Static CPU information", &[("threads", &temp.processor.threads.to_string())]);
 
-		if temp.settings.cpu_details {
+		if temp.settings.cpu_details || temp.settings.all_metrics {
 			metrics += &create_gauge_metric("cpu_load_1min", "CPU load recorded in last minute", &temp.processor.min1.to_string(), None, &[], temp.processor.refreshed);
 			metrics += &create_gauge_metric("cpu_load_5min", "CPU load recorded in last 5 minutes", &temp.processor.min5.to_string(), None, &[], temp.processor.refreshed);
 			metrics += &create_gauge_metric("cpu_load_15min", "CPU load recorded in last 15 minutes", &temp.processor.min15.to_string(), None, &[], temp.processor.refreshed);
 		}
 
-		if temp.settings.memory_details {
+		if temp.settings.memory_details || temp.settings.all_metrics {
 			metrics += &create_gauge_metric("memory_total", "Total memory in bytes", &temp.memory.total.to_string(), Some("bytes"), &[], temp.memory.refreshed);
 			metrics += &create_gauge_metric("memory_available", "Available memory in bytes", &temp.memory.available.to_string(), Some("bytes"), &[], temp.memory.refreshed);
 			metrics += &create_gauge_metric("memory_used", "Used memory in bytes", &temp.memory.used.to_string(), Some("bytes"), &[], temp.memory.refreshed);
 			metrics += &create_gauge_metric("memory_free", "Free memory in bytes", &temp.memory.free.to_string(), Some("bytes"), &[], temp.memory.refreshed);
 		}
 
-		if temp.settings.swap_details {
+		if temp.settings.swap_details || temp.settings.all_metrics {
 			metrics += &create_gauge_metric("swap_total", "Total swap storage in bytes", &temp.swap.total.to_string(), Some("bytes"), &[], temp.swap.refreshed);
 			metrics += &create_gauge_metric("swap_used", "Used swap storage in bytes", &temp.swap.used.to_string(), Some("bytes"), &[], temp.swap.refreshed);
 			metrics += &create_gauge_metric("swap_free", "Free swap storage in bytes", &temp.swap.free.to_string(), Some("bytes"), &[], temp.swap.refreshed);
@@ -145,7 +145,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 				metrics += &create_gauge_metric_line("storage_write_speed", &storage.write_speed.to_string(), Some("bytes_per_second"), &[("device", device), ("mount", &storage.mount_point)], storage.refreshed);
 			}
 
-			if temp.settings.storage_details {
+			if temp.settings.storage_details || temp.settings.all_metrics {
 				metrics += &create_metric_header("storage_used", "Used storage in bytes", "gauge", Some("bytes"));
 				for (device, storage) in &temp.storage_devices {
 					metrics += &create_gauge_metric_line("storage_used", &storage.used.to_string(), Some("bytes"), &[("device", device), ("mount", &storage.mount_point)], storage.refreshed);
@@ -174,7 +174,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 				metrics += &create_gauge_metric_line("network_upload_speed", &network.upload.to_string(), Some("bytes_per_second"), &[("interface", iface)], network.refreshed);
 			}
 
-			if temp.settings.network_details {
+			if temp.settings.network_details || temp.settings.all_metrics {
 				metrics += &create_metric_header("network_packets_received", "Total number of incoming packets", "counter", None);
 				for (iface, network) in &temp.network_interfaces {
 					metrics += &create_counter_metric_line("network_packets_received", &network.total_packets_received.to_string(), None, &[("interface", iface)], network.refreshed, temp.system_info.boot_time);
@@ -221,7 +221,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v7.0.2</br>
+	<b>Version:</b> v7.1.0</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>

@@ -35,6 +35,10 @@ pub mod utils;
 	#[arg(long, value_delimiter = ',')]
 	interfaces: Vec<String>,
 
+	/// Enable all detailed metrics
+	#[arg(long, default_value_t = false)]
+	all_metrics: bool,
+
 	/// Enable detailed CPU metrics
 	#[arg(long, default_value_t = false)]
 	cpu_details: bool,
@@ -68,6 +72,7 @@ async fn main() {
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
+			temp.settings.all_metrics = args.all_metrics;
 			temp.settings.cpu_details = args.cpu_details;
 			temp.settings.memory_details = args.memory_details;
 			temp.settings.swap_details = args.swap_details;
@@ -103,7 +108,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.0.2\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

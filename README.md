@@ -14,6 +14,7 @@ Available options:
   -c, --cache <CACHE>            Cache time in seconds [default: 3]
   -t, --token <TOKEN>            Bearer token for authentication (optional)
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
+      --all-metrics              Enable all detailed metrics
       --cpu-details              Enable detailed CPU metrics
       --memory-details           Enable detailed memory metrics
       --swap-details             Enable detailed swap metrics
@@ -48,7 +49,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=rabbitmonitor
+ExecStart=rabbitmonitor --all-metrics
 TimeoutStartSec=0
 TimeoutStopSec=2
 RemainAfterExit=yes

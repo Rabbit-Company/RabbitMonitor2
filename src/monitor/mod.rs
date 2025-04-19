@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::Utc;
 use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
 use system_info::SystemInfo;
 use crate::utils::mega_bits;
@@ -55,7 +55,7 @@ impl Monitor{
 	}
 
 	pub fn refresh(&mut self){
-		let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+		let now = Duration::from_millis(Utc::now().timestamp_millis() as u64);
 
 		self.cpu(now);
 		self.memory(now);
