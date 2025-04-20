@@ -31,7 +31,6 @@ pub mod utils;
 	#[arg(short, long)]
 	token: Option<String>,
 
-
 	/// Show available network interfaces and exit
 	#[arg(long)]
 	interface_list: bool,
