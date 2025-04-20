@@ -31,9 +31,22 @@ pub mod utils;
 	#[arg(short, long)]
 	token: Option<String>,
 
+
+	/// Show available network interfaces and exit
+	#[arg(long)]
+	interface_list: bool,
+
+	/// Show available storage devices and exit
+	#[arg(long)]
+	storage_list: bool,
+
 	/// Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
 	#[arg(long, value_delimiter = ',')]
 	interfaces: Vec<String>,
+
+	/// Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
+	#[arg(long, value_delimiter = ',')]
+	mounts: Vec<String>,
 
 	/// Enable all detailed metrics
 	#[arg(long, default_value_t = false)]
@@ -67,11 +80,32 @@ async fn main() {
 	let cloned: Arc<Mutex<Monitor>> = monitor.clone();
 	let token: Option<String> = args.token.clone();
 
+	if args.interface_list {
+		let interfaces = sysinfo::Networks::new_with_refreshed_list();
+		println!("Available network interfaces:");
+		for (name, _) in interfaces.iter() {
+			println!("- {}", name);
+		}
+		return;
+	}
+
+	if args.storage_list {
+		let disks = sysinfo::Disks::new_with_refreshed_list();
+		println!("Available storage devices:");
+		for disk in disks.iter() {
+			let name = disk.name().to_string_lossy();
+			let mount = disk.mount_point().to_string_lossy();
+			println!("- {} (mount: {})", name, mount);
+		}
+		return;
+	}
+
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
+			temp.settings.mounts = args.mounts;
 			temp.settings.all_metrics = args.all_metrics;
 			temp.settings.cpu_details = args.cpu_details;
 			temp.settings.memory_details = args.memory_details;
@@ -108,7 +142,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.2.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

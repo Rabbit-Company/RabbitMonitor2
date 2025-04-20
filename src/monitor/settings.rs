@@ -1,7 +1,7 @@
 pub struct Settings {
 	pub cache: u64,
 	pub interfaces: Vec<String>,
-	pub disks: Vec<String>,
+	pub mounts: Vec<String>,
 	pub all_metrics: bool,
 	pub cpu_details: bool,
 	pub memory_details: bool,
@@ -16,7 +16,7 @@ impl Settings {
 		Settings {
 			cache: 3,
 			interfaces: Vec::new(),
-			disks: Vec::new(),
+			mounts: Vec::new(),
 			all_metrics: false,
 			cpu_details: false,
 			memory_details: false,

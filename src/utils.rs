@@ -94,7 +94,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 	{
 		let temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 
-		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.1.0")]);
+		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.2.0")]);
 		metrics += &create_info_metric("system_info", "System information", &[
 			("name", &temp.system_info.name),
 			("kernel_version", &temp.system_info.kernel_version),
@@ -221,7 +221,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v7.1.0</br>
+	<b>Version:</b> v7.2.0</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>

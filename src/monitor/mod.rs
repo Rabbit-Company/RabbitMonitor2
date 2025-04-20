@@ -113,8 +113,13 @@ impl Monitor{
 		}
 
 		for disk in self.disks.list() {
-			let name = disk.name().to_string_lossy().to_string();
 			let mount = disk.mount_point().to_string_lossy().to_string();
+
+			if !self.settings.mounts.is_empty() && !self.settings.mounts.contains(&mount) {
+				continue; // Skip if not in the user-defined mount list
+			}
+
+			let name = disk.name().to_string_lossy().to_string();
 			let total = disk.total_space();
 			let free = disk.available_space();
 			let used = total - free;
@@ -148,20 +153,23 @@ impl Monitor{
 			millis = 1.0;
 		}
 
-		for iface in &self.settings.interfaces {
-			if let Some(network) = self.networks.get(iface) {
-				let download = mega_bits(network.received() as f64 / millis);
-				let upload = mega_bits(network.transmitted() as f64 / millis);
-				self.network_interfaces.insert(iface.clone(), Network {
-					download,
-					upload,
-					total_errors_on_received: network.total_errors_on_received(),
-					total_errors_on_transmitted: network.total_errors_on_transmitted(),
-					total_packets_received: network.total_packets_received(),
-					total_packets_transmitted: network.total_packets_transmitted(),
-					refreshed: now
-				});
+		for (iface, network) in self.networks.list() {
+
+			if !self.settings.interfaces.is_empty() && !self.settings.interfaces.contains(iface) {
+				continue; // Skip if not in the user-defined interface list
 			}
+
+			let download = mega_bits(network.received() as f64 / millis);
+			let upload = mega_bits(network.transmitted() as f64 / millis);
+			self.network_interfaces.insert(iface.clone(), Network {
+				download,
+				upload,
+				total_errors_on_received: network.total_errors_on_received(),
+				total_errors_on_transmitted: network.total_errors_on_transmitted(),
+				total_packets_received: network.total_packets_received(),
+				total_packets_transmitted: network.total_packets_transmitted(),
+				refreshed: now
+			});
 		}
 	}
 

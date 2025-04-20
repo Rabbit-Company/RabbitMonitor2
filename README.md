@@ -13,7 +13,10 @@ Available options:
   -p, --port <PORT>              Bind the server to specific port [default: 8088]
   -c, --cache <CACHE>            Cache time in seconds [default: 3]
   -t, --token <TOKEN>            Bearer token for authentication (optional)
+      --interface-list           Show available network interfaces and exit
+      --storage-list             Show available storage devices and exit
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
+      --mounts <MOUNTS>          Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
       --all-metrics              Enable all detailed metrics
       --cpu-details              Enable detailed CPU metrics
       --memory-details           Enable detailed memory metrics
