@@ -52,7 +52,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=rabbitmonitor --all-metrics
+ExecStart=rabbitmonitor --interfaces eth0 --all-metrics
 TimeoutStartSec=0
 TimeoutStopSec=2
 RemainAfterExit=yes
@@ -89,3 +89,21 @@ Rabbit Monitor has a pre-made Grafana dashboard that looks like this:
 ![Grafana Dashboard](https://raw.githubusercontent.com/Rabbit-Company/RabbitMonitor2/main/images/1.png)
 
 It can be installed from official Grafana website: [https://grafana.com/grafana/dashboards/18562](https://grafana.com/grafana/dashboards/18562)
+
+# Troubleshooting
+
+## Prometheus or Grafana not scraping data?
+
+Make sure your system clock is properly synchronized. Prometheus and other monitoring tools rely heavily on accurate time to align metrics. If your machine’s time is out of sync, scraping may fail or cause missing/incorrect data in dashboards.
+
+To fix this, ensure a time synchronization service like `systemd-timesyncd`, `chrony`, or `ntpd` is running on your system:
+```bash
+timedatectl status
+```
+
+Enable time sync if it's not active:
+```bash
+sudo timedatectl set-ntp true
+```
+
+For servers running in containers or VMs, verify the host time is also synced correctly.
