@@ -39,6 +39,10 @@ pub mod utils;
 	#[arg(long)]
 	storage_list: bool,
 
+	/// Show available components and exit
+	#[arg(long)]
+	component_list: bool,
+
 	/// Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
 	#[arg(long, value_delimiter = ',')]
 	interfaces: Vec<String>,
@@ -46,6 +50,10 @@ pub mod utils;
 	/// Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
 	#[arg(long, value_delimiter = ',')]
 	mounts: Vec<String>,
+
+	/// Comma-separated list of components to monitor (e.g., "GPU,Battery")
+	#[arg(long, value_delimiter = ',')]
+	components: Vec<String>,
 
 	/// Enable all detailed metrics
 	#[arg(long, default_value_t = false)]
@@ -99,12 +107,22 @@ async fn main() {
 		return;
 	}
 
+	if args.component_list {
+		let components = sysinfo::Components::new_with_refreshed_list();
+		println!("Available components:");
+		for component in &components {
+			println!("- {} ({}°C)", component.label(), component.temperature().unwrap_or(0.0));
+		}
+		return;
+	}
+
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
 			temp.settings.mounts = args.mounts;
+			temp.settings.components = args.components;
 			temp.settings.all_metrics = args.all_metrics;
 			temp.settings.cpu_details = args.cpu_details;
 			temp.settings.memory_details = args.memory_details;
@@ -141,7 +159,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v7.2.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v8.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

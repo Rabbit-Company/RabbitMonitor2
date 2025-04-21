@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use chrono::Utc;
-use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
+use components::Component;
+use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
 use system_info::SystemInfo;
 use crate::utils::mega_bits;
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
@@ -13,11 +14,13 @@ pub mod memory;
 pub mod swap;
 pub mod storage;
 pub mod network;
+pub mod components;
 
 pub struct Monitor{
 	pub system: System,
 	pub disks: Disks,
 	pub networks: Networks,
+	pub components: Components,
 	pub settings: Settings,
 	pub system_info: SystemInfo,
 	pub processor: Processor,
@@ -25,6 +28,7 @@ pub struct Monitor{
 	pub swap: Swap,
 	pub storage_devices: HashMap<String, Storage>,
 	pub network_interfaces: HashMap<String, Network>,
+	pub component_list: HashMap<String, Component>,
 	pub refreshed: Instant
 }
 
@@ -36,6 +40,7 @@ impl Monitor{
 
 		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage().with_io_usage());
 		let networks = Networks::new_with_refreshed_list();
+		let components = Components::new_with_refreshed_list();
 
 		let system_info = SystemInfo {
 			name: System::name().unwrap_or("unknown".to_string()),
@@ -51,7 +56,7 @@ impl Monitor{
 		processor.arch = System::cpu_arch();
 		processor.threads = sys.cpus().len() as u64;
 
-		Monitor {system: sys, disks, networks, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), refreshed: Instant::now() }
+		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
@@ -62,6 +67,7 @@ impl Monitor{
 		self.swap(now);
 		self.storage(now);
 		self.network(now);
+		self.componenet(now);
 
 		self.refreshed = Instant::now();
 	}
@@ -168,6 +174,26 @@ impl Monitor{
 				total_errors_on_transmitted: network.total_errors_on_transmitted(),
 				total_packets_received: network.total_packets_received(),
 				total_packets_transmitted: network.total_packets_transmitted(),
+				refreshed: now
+			});
+		}
+	}
+
+	pub fn componenet(&mut self, now: Duration){
+		self.components.refresh(true);
+
+		for component in self.components.list() {
+			let label = component.label().to_string();
+
+			if !self.settings.components.is_empty() && self.settings.components.contains(&label){
+				continue; // Skip if not in the user-defined components list
+			}
+
+			self.component_list.insert(component.label().to_string(), Component {
+				label: component.label().to_string(),
+				temperature: component.temperature(),
+				critical: component.critical(),
+				max: component.max(),
 				refreshed: now
 			});
 		}

@@ -15,8 +15,10 @@ Available options:
   -t, --token <TOKEN>            Bearer token for authentication (optional)
       --interface-list           Show available network interfaces and exit
       --storage-list             Show available storage devices and exit
+      --component-list           Show available components and exit
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
       --mounts <MOUNTS>          Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
+      --components <COMPONENTS>  Comma-separated list of components to monitor (e.g., "GPU,Battery")
       --all-metrics              Enable all detailed metrics
       --cpu-details              Enable detailed CPU metrics
       --memory-details           Enable detailed memory metrics
@@ -52,7 +54,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=rabbitmonitor --interfaces eth0 --all-metrics
+ExecStart=rabbitmonitor --all-metrics
 TimeoutStartSec=0
 TimeoutStopSec=2
 RemainAfterExit=yes
@@ -97,11 +99,13 @@ It can be installed from official Grafana website: [https://grafana.com/grafana/
 Make sure your system clock is properly synchronized. Prometheus and other monitoring tools rely heavily on accurate time to align metrics. If your machine’s time is out of sync, scraping may fail or cause missing/incorrect data in dashboards.
 
 To fix this, ensure a time synchronization service like `systemd-timesyncd`, `chrony`, or `ntpd` is running on your system:
+
 ```bash
 timedatectl status
 ```
 
 Enable time sync if it's not active:
+
 ```bash
 sudo timedatectl set-ntp true
 ```

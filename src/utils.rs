@@ -94,7 +94,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 	{
 		let temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 
-		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v7.2.0")]);
+		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v8.0.0")]);
 		metrics += &create_info_metric("system_info", "System information", &[
 			("name", &temp.system_info.name),
 			("kernel_version", &temp.system_info.kernel_version),
@@ -196,6 +196,13 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 				}
 			}
 		}
+
+		if !temp.component_list.is_empty() {
+			metrics += &create_metric_header("hardware_component_temperature", "Temperature of hardware components in celsius", "gauge", Some("celsius"));
+			for (label, component) in &temp.component_list {
+				metrics += &create_gauge_metric_line("hardware_component_temperature", &component.temperature.unwrap_or(0.0).to_string(), Some("celsius"), &[("component", label)], component.refreshed);
+			}
+		}
 	}
 	metrics += "# EOF\n";
 	metrics
@@ -221,7 +228,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v7.2.0</br>
+	<b>Version:</b> v8.0.0</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>
@@ -255,6 +262,16 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 			name,
 			iface.download,
 			iface.upload
+		);
+	}
+
+	// Add all components
+	html += r#"<tr><th colspan="2">Components</th></tr>"#;
+	for (name, component) in &temp.component_list {
+		html += &format!(
+			r#"<tr><th>{}</th><td>{:.2} °C</td></tr>"#,
+			name,
+			component.temperature.unwrap_or(0.0),
 		);
 	}
 
