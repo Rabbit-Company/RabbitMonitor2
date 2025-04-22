@@ -16,9 +16,11 @@ Available options:
       --interface-list           Show available network interfaces and exit
       --storage-list             Show available storage devices and exit
       --component-list           Show available components and exit
+      --process-list             Show all processes and exit
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
       --mounts <MOUNTS>          Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
       --components <COMPONENTS>  Comma-separated list of components to monitor (e.g., "GPU,Battery")
+      --processes <PROCESSES>    Comma-separated list of process PIDs or names to monitor (e.g., "18295,rabbitmonitor")
       --all-metrics              Enable all detailed metrics
       --cpu-details              Enable detailed CPU metrics
       --memory-details           Enable detailed memory metrics

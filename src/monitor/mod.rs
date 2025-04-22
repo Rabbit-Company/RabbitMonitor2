@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use chrono::Utc;
 use components::Component;
-use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, System};
+use processes::Process;
+use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, Pid, ProcessRefreshKind, System};
 use system_info::SystemInfo;
 use crate::utils::mega_bits;
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
@@ -15,6 +16,7 @@ pub mod swap;
 pub mod storage;
 pub mod network;
 pub mod components;
+pub mod processes;
 
 pub struct Monitor{
 	pub system: System,
@@ -29,6 +31,7 @@ pub struct Monitor{
 	pub storage_devices: HashMap<String, Storage>,
 	pub network_interfaces: HashMap<String, Network>,
 	pub component_list: HashMap<String, Component>,
+	pub process_list: HashMap<String, Process>,
 	pub refreshed: Instant
 }
 
@@ -56,7 +59,7 @@ impl Monitor{
 		processor.arch = System::cpu_arch();
 		processor.threads = sys.cpus().len() as u64;
 
-		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), refreshed: Instant::now() }
+		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
@@ -68,6 +71,7 @@ impl Monitor{
 		self.storage(now);
 		self.network(now);
 		self.componenet(now);
+		self.processes(now);
 
 		self.refreshed = Instant::now();
 	}
@@ -196,6 +200,55 @@ impl Monitor{
 				max: component.max(),
 				refreshed: now
 			});
+		}
+	}
+
+	pub fn processes(&mut self, now: Duration){
+		let mut pids_to_refresh = Vec::new();
+
+		for key in &self.settings.processes {
+			if let Ok(pid_num) = key.parse::<u32>() {
+				let pid = Pid::from_u32(pid_num);
+				if self.system.process(pid).is_some() {
+					pids_to_refresh.push(pid);
+				}
+			} else {
+				for (pid, process) in self.system.processes() {
+					if process.name().to_string_lossy() == key.as_str() {
+						pids_to_refresh.push(*pid);
+					}
+				}
+			}
+		}
+
+		self.system.refresh_processes_specifics(
+			sysinfo::ProcessesToUpdate::Some(&pids_to_refresh),
+			true,
+			ProcessRefreshKind::nothing().with_cpu().with_memory(),
+		);
+
+		for pid in pids_to_refresh {
+			if let Some(sys_proc) = self.system.process(pid) {
+				let pid_str = pid.as_u32().to_string();
+
+				let key = if self.process_list.contains_key(&pid_str) {
+					pid_str
+				} else {
+					sys_proc.name().to_string_lossy().to_string()
+				};
+
+				self.process_list
+					.entry(key.clone())
+					.or_default()
+					.pid = pid.as_u32();
+
+				let proc_entry = self.process_list.get_mut(&key).unwrap();
+				proc_entry.name = sys_proc.name().to_string_lossy().to_string();
+				proc_entry.cpu = sys_proc.cpu_usage();
+				proc_entry.memory = sys_proc.memory();
+				proc_entry.virtual_memory = sys_proc.virtual_memory();
+				proc_entry.refreshed = now;
+			}
 		}
 	}
 

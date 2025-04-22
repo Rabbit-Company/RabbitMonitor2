@@ -43,6 +43,10 @@ pub mod utils;
 	#[arg(long)]
 	component_list: bool,
 
+	/// Show all processes and exit
+	#[arg(long)]
+	process_list: bool,
+
 	/// Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
 	#[arg(long, value_delimiter = ',')]
 	interfaces: Vec<String>,
@@ -54,6 +58,10 @@ pub mod utils;
 	/// Comma-separated list of components to monitor (e.g., "GPU,Battery")
 	#[arg(long, value_delimiter = ',')]
 	components: Vec<String>,
+
+	/// Comma-separated list of process PIDs or names to monitor (e.g., "18295,rabbitmonitor")
+	#[arg(long, value_delimiter = ',')]
+	processes: Vec<String>,
 
 	/// Enable all detailed metrics
 	#[arg(long, default_value_t = false)]
@@ -116,6 +124,20 @@ async fn main() {
 		return;
 	}
 
+	if args.process_list {
+		let mut system = sysinfo::System::new_all();
+		system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+		let mut processes: Vec<_> = system.processes().iter().collect();
+		processes.sort_by_key(|(_, p)| p.name().to_string_lossy());
+
+		println!("Available processes:");
+		for (pid, process) in processes {
+			println!("- {} ({}) [{}]", process.name().to_string_lossy(), pid, process.status());
+		}
+		return;
+	}
+
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
@@ -123,6 +145,7 @@ async fn main() {
 			temp.settings.interfaces = args.interfaces;
 			temp.settings.mounts = args.mounts;
 			temp.settings.components = args.components;
+			temp.settings.processes = args.processes;
 			temp.settings.all_metrics = args.all_metrics;
 			temp.settings.cpu_details = args.cpu_details;
 			temp.settings.memory_details = args.memory_details;
@@ -159,7 +182,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v8.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v9.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

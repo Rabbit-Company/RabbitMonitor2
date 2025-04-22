@@ -1,6 +1,6 @@
 [package]
 name = "rabbitmonitor"
-version = "8.0.0"
+version = "9.0.0"
 authors = ["Rabbit Company LLC <info@rabbit-company.com>"]
 description = "Simple server monitor"
 edition = "2021"
