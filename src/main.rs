@@ -9,6 +9,9 @@ use monitor::Monitor;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::{thread::sleep, time::Duration};
 
+use crate::monitor::energy::Energy;
+use crate::monitor::settings::EnergySettings;
+
 pub mod monitor;
 pub mod utils;
 
@@ -38,6 +41,10 @@ pub mod utils;
 	/// Show available storage devices and exit
 	#[arg(long)]
 	storage_list: bool,
+
+	/// Show available batteries and exit
+	#[arg(long)]
+	battery_list: bool,
 
 	/// Show available components and exit
 	#[arg(long)]
@@ -138,11 +145,68 @@ async fn main() {
 		return;
 	}
 
+	if args.battery_list {
+		match battery::Manager::new() {
+			Ok(manager) => {
+				match manager.batteries() {
+					Ok(batteries) => {
+						println!("Available batteries:");
+						for (i, battery) in batteries.enumerate() {
+							match battery {
+								Ok(bat) => {
+									println!("\nBattery #{}:", i + 1);
+									println!("  - Vendor: {}", bat.vendor().unwrap_or("Unknown"));
+									println!("  - Model: {}", bat.model().unwrap_or("Unknown"));
+									println!("  - Serial: {}", bat.serial_number().unwrap_or("Unknown"));
+									println!("  - Technology: {:?}", bat.technology());
+									println!("  - State: {:?}", bat.state());
+									println!("  - Charge: {:.1}%", bat.state_of_charge().value * 100.0);
+									println!("  - Energy: {:.2} Wh / {:.2} Wh", bat.energy().value, bat.energy_full().value);
+									println!("  - Health: {:.2}%", bat.state_of_health().value * 100.0);
+									println!("  - Voltage: {:.2} V", bat.voltage().value);
+									if let Some(temp) = bat.temperature() {
+										println!("  - Temperature: {:.1}°C", temp.value);
+									}
+									if let Some(cycles) = bat.cycle_count() {
+										println!("  - Cycle count: {}", cycles);
+									}
+									if let Some(time) = bat.time_to_full() {
+										println!("  - Time to charge: {:.2} minutes", time.value / 60.0);
+									}
+									if let Some(time) = bat.time_to_empty() {
+										println!("  - Time to discharge: {:.2} minutes", time.value / 60.0);
+									}
+									println!();
+								},
+								Err(e) => {
+									println!("  - Error reading battery info: {}", e);
+								}
+							}
+						}
+					},
+					Err(e) => {
+						println!("Failed to list batteries: {}", e);
+					}
+				}
+			},
+			Err(e) => {
+				println!("Failed to initialize battery manager: {}", e);
+			}
+		}
+		return;
+  }
+
+	let enable_ipmitool = Energy::get_power_usage_w().is_some();
+
+	let power_usage_interval = Energy::get_dcmi_power_with_info()
+    .and_then(|dcmi| dcmi.power.and(dcmi.sampling_period_seconds));
+
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
+			temp.settings.energy = EnergySettings{ enabled: enable_ipmitool, interval: power_usage_interval };
 			temp.settings.mounts = args.mounts;
 			temp.settings.components = args.components;
 			temp.settings.processes = args.processes;
@@ -182,7 +246,7 @@ async fn index(
 	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v9.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (StatusCode::NOT_FOUND, "Rabbit Monitor v10.0.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()

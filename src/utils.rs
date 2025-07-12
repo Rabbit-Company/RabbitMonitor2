@@ -94,7 +94,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 	{
 		let temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 
-		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v9.0.0")]);
+		metrics += &create_info_metric("version_info", "Rabbit Monitor version", &[("version", "v10.0.0")]);
 		metrics += &create_info_metric("system_info", "System information", &[
 			("name", &temp.system_info.name),
 			("kernel_version", &temp.system_info.kernel_version),
@@ -104,12 +104,22 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 			("host_name", &temp.system_info.host_name),
 			("boot_time", &temp.system_info.boot_time.to_string()),
 		]);
-		metrics += &create_info_metric("cpu_info", "Static CPU information", &[("threads", &temp.processor.threads.to_string())]);
+		metrics += &create_info_metric("cpu_info", "Static CPU information", &[("arch", &temp.processor.arch), ("threads", &temp.processor.thread_count.to_string()) ]);
 
 		if temp.settings.cpu_details || temp.settings.all_metrics {
 			metrics += &create_gauge_metric("cpu_load_1min", "CPU load recorded in last minute", &temp.processor.min1.to_string(), None, &[], temp.processor.refreshed);
 			metrics += &create_gauge_metric("cpu_load_5min", "CPU load recorded in last 5 minutes", &temp.processor.min5.to_string(), None, &[], temp.processor.refreshed);
 			metrics += &create_gauge_metric("cpu_load_15min", "CPU load recorded in last 15 minutes", &temp.processor.min15.to_string(), None, &[], temp.processor.refreshed);
+
+			metrics += &create_metric_header("cpu_thread_usage", "CPU load per thread in percent", "gauge", Some("percent"));
+			for thead in &temp.processor.threads {
+				metrics += &create_gauge_metric_line("cpu_thread_usage", &format!("{:.2}", thead.cpu_usage), Some("percent"), &[("name", &thead.name), ("brand", &thead.brand)], temp.processor.refreshed);
+			}
+
+			metrics += &create_metric_header("cpu_thread_frequency", "CPU frequency per thread in hertz", "gauge", Some("hertz"));
+			for thead in &temp.processor.threads {
+				metrics += &create_gauge_metric_line("cpu_thread_frequency", &(thead.frequency * 1_000_000).to_string(), Some("hertz"), &[("name", &thead.name), ("brand", &thead.brand)], temp.processor.refreshed);
+			}
 		}
 
 		if temp.settings.memory_details || temp.settings.all_metrics {
@@ -128,6 +138,11 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 		metrics += &create_gauge_metric("cpu_load", "CPU load in percent", &format!("{:.2}", temp.processor.percent), Some("percent"), &[], temp.processor.refreshed);
 		metrics += &create_gauge_metric("memory", "Used memory in percent", &format!("{:.2}", temp.memory.percent), Some("percent"), &[], temp.memory.refreshed);
 		metrics += &create_gauge_metric("swap", "Used swap storage in percent", &format!("{:.2}", temp.swap.percent), Some("percent"), &[], temp.swap.refreshed);
+
+		if temp.settings.energy.enabled {
+			let energy = temp.energy.lock().unwrap();
+			metrics += &create_gauge_metric("power_consumption", "Power consumption in watts", &format!("{:.2}", energy.power_consumption), Some("watts"), &[], energy.refreshed);
+		}
 
 		if !temp.storage_devices.is_empty() {
 			metrics += &create_metric_header("storage", "Used storage in percent", "gauge", Some("percent"));
@@ -245,7 +260,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v9.0.0</br>
+	<b>Version:</b> v10.0.0</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>

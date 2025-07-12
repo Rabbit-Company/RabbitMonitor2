@@ -1,10 +1,15 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
+use battery::Battery;
 use chrono::Utc;
 use components::Component;
 use processes::Process;
 use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, Pid, ProcessRefreshKind, System};
 use system_info::SystemInfo;
+use crate::monitor::energy::Energy;
+use crate::monitor::processor::Thread;
 use crate::utils::mega_bits;
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
 
@@ -17,6 +22,8 @@ pub mod storage;
 pub mod network;
 pub mod components;
 pub mod processes;
+pub mod battery;
+pub mod energy;
 
 pub struct Monitor{
 	pub system: System,
@@ -28,6 +35,8 @@ pub struct Monitor{
 	pub processor: Processor,
 	pub memory: Memory,
 	pub swap: Swap,
+	pub energy: Arc<Mutex<Energy>>,
+	pub batteries: HashMap<String, Battery>,
 	pub storage_devices: HashMap<String, Storage>,
 	pub network_interfaces: HashMap<String, Network>,
 	pub component_list: HashMap<String, Component>,
@@ -57,9 +66,10 @@ impl Monitor{
 
 		let mut processor = Processor::new();
 		processor.arch = System::cpu_arch();
-		processor.threads = sys.cpus().len() as u64;
+		processor.thread_count = sys.cpus().len() as u64;
+		processor.calculate_cpu_usage();
 
-		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), refreshed: Instant::now() }
+		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), energy: Arc::new(Mutex::new(Energy::new())), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), batteries: HashMap::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
@@ -73,6 +83,10 @@ impl Monitor{
 		self.componenet(now);
 		self.processes(now);
 
+		if self.settings.energy.enabled {
+			self.energy_async(now);
+		}
+
 		self.refreshed = Instant::now();
 	}
 
@@ -82,8 +96,37 @@ impl Monitor{
 		self.processor.min5 = load_average.five;
 		self.processor.min15 = load_average.fifteen;
 
-		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage());
-		self.processor.percent = self.system.global_cpu_usage();
+		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
+
+		/*
+		let cpus = self.system.cpus();
+    let total_usage: f32 = cpus.iter().map(|cpu| cpu.cpu_usage()).sum();
+    let average_usage = if cpus.is_empty() {
+      0.0
+    } else {
+      total_usage / cpus.len() as f32
+    };
+    self.processor.percent = average_usage;
+
+		let vmstat_cpu = get_vmstat_cpu_usage().unwrap_or(-1.0);
+
+		println!(
+      "CPU sysinfo (manual): {:.2}% | CPU sysinfo (global_cpu_usage): {:.2}% | CPU VMSTAT: {:.2}% | CPU /proc/stat: {:.2}%",
+      self.system.global_cpu_usage(),
+      average_usage,
+      vmstat_cpu,
+			self.processor.calculate_cpu_usage()
+    );
+		*/
+
+		self.processor.calculate_cpu_usage();
+
+		self.processor.threads = self.system.cpus().iter().map(|cpu| Thread {
+    	name: cpu.name().into(),
+    	brand: cpu.brand().into(),
+    	cpu_usage: cpu.cpu_usage(),
+    	frequency: cpu.frequency(),
+		}).collect();
 
 		self.processor.refreshed = now;
 	}
@@ -112,6 +155,46 @@ impl Monitor{
 
 		self.swap.refreshed = now;
 	}
+
+	pub fn energy_async(&self, now: Duration) {
+		let energy_clone = Arc::clone(&self.energy);
+		let use_dcmi = self
+			.settings
+			.energy
+			.interval
+			.map_or(false, |interval| interval <= self.settings.cache);
+
+		// Check if we're already updating
+		{
+			let energy_guard = energy_clone.lock().unwrap();
+			if energy_guard.is_updating {
+				return;
+			}
+		}
+
+		if use_dcmi {
+			// DCMI is fast, do it synchronously
+			let mut energy_guard = energy_clone.lock().unwrap();
+			energy_guard.refresh_dcmi(now);
+		} else {
+			// Sensor reading is slow, spawn background thread
+			thread::spawn(move || {
+				let mut energy_guard = energy_clone.lock().unwrap();
+				energy_guard.is_updating = true;
+				drop(energy_guard); // Release lock during slow operation
+
+				if let Some(power) = Energy::get_sensor_power() {
+					let mut energy_guard = energy_clone.lock().unwrap();
+					energy_guard.power_consumption = power;
+					energy_guard.refreshed = now;
+					energy_guard.is_updating = false;
+				} else {
+					let mut energy_guard = energy_clone.lock().unwrap();
+					energy_guard.is_updating = false;
+				}
+			});
+		}
+  }
 
 	pub fn storage(&mut self, now: Duration){
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
@@ -259,3 +342,27 @@ impl Default for Monitor {
 		Self::new()
 	}
 }
+
+/*
+fn get_vmstat_cpu_usage() -> Option<f32> {
+	let output = Command::new("vmstat")
+		.args(&["1", "2"])
+		.output()
+		.ok()?;
+
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	let lines: Vec<&str> = stdout.lines().collect();
+
+	// Last line should be the actual sampled data
+	let data_line = lines.iter().rev().find(|line| line.trim().chars().next().map_or(false, |c| c.is_digit(10)))?;
+
+	let columns: Vec<&str> = data_line.split_whitespace().collect();
+	if columns.len() < 15 {
+		return None;
+	}
+
+	// %idle is usually column 15, 0-based index 14
+	let idle: f32 = columns[14].parse().ok()?;
+	Some(100.0 - idle)
+}
+*/
