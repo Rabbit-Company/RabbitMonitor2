@@ -161,7 +161,7 @@ async fn main() {
 									println!("  - Technology: {:?}", bat.technology());
 									println!("  - State: {:?}", bat.state());
 									println!("  - Charge: {:.1}%", bat.state_of_charge().value * 100.0);
-									println!("  - Energy: {:.2} Wh / {:.2} Wh", bat.energy().value, bat.energy_full().value);
+									println!("  - Energy: {:.2} Wh / {:.2} Wh", bat.energy().value / 3600.0, bat.energy_full().value / 3600.0);
 									println!("  - Health: {:.2}%", bat.state_of_health().value * 100.0);
 									println!("  - Voltage: {:.2} V", bat.voltage().value);
 									if let Some(temp) = bat.temperature() {
