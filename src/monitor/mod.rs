@@ -10,6 +10,7 @@ use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshK
 use system_info::SystemInfo;
 use crate::monitor::energy::Energy;
 use crate::monitor::processor::Thread;
+use crate::monitor::ups::UPS;
 use crate::utils::mega_bits;
 use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
 
@@ -23,6 +24,7 @@ pub mod network;
 pub mod components;
 pub mod processes;
 pub mod battery;
+pub mod ups;
 pub mod energy;
 
 pub struct Monitor{
@@ -36,6 +38,7 @@ pub struct Monitor{
 	pub memory: Memory,
 	pub swap: Swap,
 	pub energy: Arc<Mutex<Energy>>,
+	pub upses: HashMap<String, UPS>,
 	pub batteries: HashMap<String, Battery>,
 	pub storage_devices: HashMap<String, Storage>,
 	pub network_interfaces: HashMap<String, Network>,
@@ -69,7 +72,7 @@ impl Monitor{
 		processor.thread_count = sys.cpus().len() as u64;
 		processor.calculate_cpu_usage();
 
-		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), energy: Arc::new(Mutex::new(Energy::new())), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), batteries: HashMap::new(), refreshed: Instant::now() }
+		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), energy: Arc::new(Mutex::new(Energy::new())), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), upses: HashMap::new(), batteries: HashMap::new(), refreshed: Instant::now() }
 	}
 
 	pub fn refresh(&mut self){
@@ -283,6 +286,13 @@ impl Monitor{
 				max: component.max(),
 				refreshed: now
 			});
+		}
+	}
+
+	pub fn ups(&mut self, now: Duration){
+		for ups_name in &self.settings.upses{
+			let ups_data = UPS::get_ups_data(ups_name, now).unwrap_or(UPS::new());
+			self.upses.insert(ups_name.to_string(), ups_data);
 		}
 	}
 

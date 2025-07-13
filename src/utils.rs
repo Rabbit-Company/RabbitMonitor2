@@ -219,6 +219,38 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 			}
 		}
 
+		if !temp.upses.is_empty() {
+			metrics += &create_metric_header("ups_charge", "UPS battery charge level", "gauge", Some("percent"));
+			for (ups_name, ups) in &temp.upses {
+				metrics += &create_gauge_metric_line("ups_charge", &format!("{:.2}", ups.charge_percent), Some("percent"), &[ ("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model) ], ups.refreshed);
+			}
+
+			metrics += &create_metric_header("ups_load", "UPS load level", "gauge", Some("percent"));
+			for (ups_name, ups) in &temp.upses {
+				metrics += &create_gauge_metric_line("ups_load", &format!("{:.2}", ups.load_percent), Some("percent"), &[("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model)], ups.refreshed);
+			}
+
+			metrics += &create_metric_header("ups_runtime", "Estimated UPS runtime on battery", "gauge", Some("seconds"));
+			for (ups_name, ups) in &temp.upses {
+				metrics += &create_gauge_metric_line("ups_runtime", &ups.runtime_seconds.to_string(), Some("seconds"), &[("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model)], ups.refreshed);
+			}
+
+			metrics += &create_metric_header("ups_input_voltage", "UPS input voltage", "gauge", Some("volts"));
+			for (ups_name, ups) in &temp.upses {
+				metrics += &create_gauge_metric_line("ups_input_voltage", &format!("{:.2}", ups.input_voltage), Some("volts"), &[("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model)], ups.refreshed);
+			}
+
+			metrics += &create_metric_header("ups_output_voltage", "UPS output voltage", "gauge", Some("volts"));
+			for (ups_name, ups) in &temp.upses {
+				metrics += &create_gauge_metric_line("ups_output_voltage", &format!("{:.2}", ups.output_voltage), Some("volts"), &[("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model)], ups.refreshed);
+			}
+
+			metrics += &create_metric_header("ups_status_info", "UPS operational status", "info", None);
+			for (ups_name, ups) in &temp.upses {
+				metrics += &format!("rabbit_ups_status_info{{ups=\"{}\",manufacturer=\"{}\",model=\"{}\",status=\"{}\"}} 1 {:.3}\n", ups_name, ups.manufacturer, ups.model, ups.status, ups.refreshed.as_secs_f64());
+			}
+		}
+
 		if !temp.process_list.is_empty() {
 			metrics += &create_metric_header("process_cpu_usage", "CPU usage of the monitored process", "gauge", None);
 			for process in temp.process_list.values() {

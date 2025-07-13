@@ -7,6 +7,7 @@ pub struct EnergySettings {
 pub struct Settings {
 	pub cache: u64,
 	pub energy: EnergySettings,
+	pub upses: Vec<String>,
 	pub interfaces: Vec<String>,
 	pub mounts: Vec<String>,
 	pub components: Vec<String>,
@@ -25,6 +26,7 @@ impl Settings {
 		Settings {
 			cache: 3,
 			energy: EnergySettings { enabled: false, interval: None },
+			upses: Vec::new(),
 			interfaces: Vec::new(),
 			mounts: Vec::new(),
 			components: Vec::new(),

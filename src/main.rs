@@ -11,6 +11,7 @@ use std::{thread::sleep, time::Duration};
 
 use crate::monitor::energy::Energy;
 use crate::monitor::settings::EnergySettings;
+use crate::monitor::ups::UPS;
 
 pub mod monitor;
 pub mod utils;
@@ -201,12 +202,15 @@ async fn main() {
 	let power_usage_interval = Energy::get_dcmi_power_with_info()
     .and_then(|dcmi| dcmi.power.and(dcmi.sampling_period_seconds));
 
+	let upses = UPS::detect_ups().unwrap_or(Vec::new());
+
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
 			temp.settings.energy = EnergySettings{ enabled: enable_ipmitool, interval: power_usage_interval };
+			temp.settings.upses = upses;
 			temp.settings.mounts = args.mounts;
 			temp.settings.components = args.components;
 			temp.settings.processes = args.processes;
