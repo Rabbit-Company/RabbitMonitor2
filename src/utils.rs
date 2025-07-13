@@ -249,6 +249,15 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String{
 			for (ups_name, ups) in &temp.upses {
 				metrics += &format!("rabbit_ups_status_info{{ups=\"{}\",manufacturer=\"{}\",model=\"{}\",status=\"{}\"}} 1 {:.3}\n", ups_name, ups.manufacturer, ups.model, ups.status, ups.refreshed.as_secs_f64());
 			}
+
+			if temp.upses.values().any(|ups| ups.real_power_nominal > 0.0) {
+				metrics += &create_metric_header("ups_power_usage", "UPS power usage in watts", "gauge", Some("watts"));
+				for (ups_name, ups) in &temp.upses {
+					if ups.real_power_nominal > 0.0 {
+						metrics += &create_gauge_metric_line("ups_power_usage", &format!("{:.2}", ups.power_usage), Some("watts"), &[("ups", ups_name), ("manufacturer", &ups.manufacturer), ("model", &ups.model)], ups.refreshed);
+					}
+				}
+			}
 		}
 
 		if !temp.process_list.is_empty() {

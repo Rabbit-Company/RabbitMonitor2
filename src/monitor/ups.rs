@@ -9,6 +9,8 @@ pub struct UPS {
 	pub runtime_seconds: u64,
 	pub input_voltage: f32,
 	pub output_voltage: f32,
+	pub real_power_nominal: f32,
+	pub power_usage: f32,
 	pub refreshed: Duration,
 }
 
@@ -24,6 +26,8 @@ impl UPS {
 			runtime_seconds: 0,
 			input_voltage: 0.0,
 			output_voltage: 0.0,
+			real_power_nominal: 0.0,
+			power_usage: 0.0,
 			refreshed: Duration::from_secs(0),
 		}
 	}
@@ -74,6 +78,8 @@ impl UPS {
 			runtime_seconds: 0,
 			input_voltage: 0.0,
 			output_voltage: 0.0,
+			real_power_nominal: 0.0,
+			power_usage: 0.0,
 			refreshed: refreshed
 		};
 
@@ -99,8 +105,13 @@ impl UPS {
 				"battery.runtime" => info.runtime_seconds = value.parse().unwrap_or(0),
 				"input.voltage" => info.input_voltage = value.parse().unwrap_or(0.0),
 				"output.voltage" => info.output_voltage = value.parse().unwrap_or(0.0),
+				"ups.realpower.nominal" => info.real_power_nominal = value.parse().unwrap_or(0.0),
 				_ => {}
 			}
+		}
+
+		if info.real_power_nominal > 0.0 {
+			info.power_usage = (info.load_percent / 100.0) * info.real_power_nominal;
 		}
 
 		Some(info)
