@@ -16,6 +16,7 @@ Available options:
       --interface-list           Show available network interfaces and exit
       --storage-list             Show available storage devices and exit
       --battery-list             Show available batteries and exit
+      --ups-list                 Show available UPS and exit
       --component-list           Show available components and exit
       --process-list             Show all processes and exit
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")

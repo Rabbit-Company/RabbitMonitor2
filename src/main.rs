@@ -47,6 +47,10 @@ pub mod utils;
 	#[arg(long)]
 	battery_list: bool,
 
+	/// Show available UPS and exit
+	#[arg(long)]
+	ups_list: bool,
+
 	/// Show available components and exit
 	#[arg(long)]
 	component_list: bool,
@@ -143,6 +147,33 @@ async fn main() {
 		for (pid, process) in processes {
 			println!("- {} ({}) [{}]", process.name().to_string_lossy(), pid, process.status());
 		}
+		return;
+	}
+
+	if args.ups_list {
+		let upses = UPS::detect_ups().unwrap_or_else(|| vec![]);
+
+    if upses.is_empty() {
+			println!("No UPS devices detected.");
+			return;
+    }
+
+		println!("Available UPS devices:");
+		for ups_name in upses {
+			println!("- {}", ups_name);
+
+			match UPS::get_ups_data(&ups_name, Duration::from_secs(0)) {
+				Some(ups) => {
+					println!("  - Model: {}", ups.model);
+					println!("  - Status: {}", ups.status);
+					println!("  - Load: {:.1}%", ups.load_percent);
+					println!("  - Charge: {:.1}%", ups.charge_percent);
+				}
+				None => {
+					println!("  - Failed to fetch UPS data.");
+				}
+			}
+    }
 		return;
 	}
 
