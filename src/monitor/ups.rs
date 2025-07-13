@@ -42,6 +42,7 @@ impl UPS {
 		let stdout = String::from_utf8_lossy(&output.stdout);
 		let devices: Vec<String> = stdout
 			.lines()
+			.filter(|line| !line.starts_with("Init SSL")) // Skip the warning
 			.map(|s| s.trim().to_string())
 			.filter(|s| !s.is_empty())
 			.collect();
@@ -77,6 +78,10 @@ impl UPS {
 		};
 
 		for line in stdout.lines() {
+			if line.starts_with("Init SSL") {
+        continue; // Skip SSL warning
+    	}
+
 			let parts: Vec<&str> = line.split(':').collect();
 			if parts.len() != 2 {
 				continue;
