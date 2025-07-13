@@ -85,6 +85,7 @@ impl Monitor{
 		self.network(now);
 		self.componenet(now);
 		self.processes(now);
+		self.ups(now);
 
 		if self.settings.energy.enabled {
 			self.energy_async(now);
