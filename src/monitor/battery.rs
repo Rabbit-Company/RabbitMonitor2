@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use battery::{units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::percent, ElectricPotential, Energy, Power, Ratio, ThermodynamicTemperature, Time}, State, Technology};
+use starship_battery::{units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::percent, ElectricPotential, Energy, Power, Ratio, ThermodynamicTemperature, Time}, State, Technology};
 
 pub struct Battery {
 	pub state_of_charge: Ratio,
