@@ -70,7 +70,6 @@ impl Monitor{
 		let mut processor = Processor::new();
 		processor.arch = System::cpu_arch();
 		processor.thread_count = sys.cpus().len() as u64;
-		processor.calculate_cpu_usage();
 
 		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), energy: Arc::new(Mutex::new(Energy::new())), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), upses: HashMap::new(), batteries: HashMap::new(), refreshed: Instant::now() }
 	}
@@ -102,28 +101,7 @@ impl Monitor{
 
 		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
 
-		/*
-		let cpus = self.system.cpus();
-    let total_usage: f32 = cpus.iter().map(|cpu| cpu.cpu_usage()).sum();
-    let average_usage = if cpus.is_empty() {
-      0.0
-    } else {
-      total_usage / cpus.len() as f32
-    };
-    self.processor.percent = average_usage;
-
-		let vmstat_cpu = get_vmstat_cpu_usage().unwrap_or(-1.0);
-
-		println!(
-      "CPU sysinfo (manual): {:.2}% | CPU sysinfo (global_cpu_usage): {:.2}% | CPU VMSTAT: {:.2}% | CPU /proc/stat: {:.2}%",
-      self.system.global_cpu_usage(),
-      average_usage,
-      vmstat_cpu,
-			self.processor.calculate_cpu_usage()
-    );
-		*/
-
-		self.processor.calculate_cpu_usage();
+		self.processor.percent = self.system.global_cpu_usage();
 
 		self.processor.threads = self.system.cpus().iter().map(|cpu| Thread {
     	name: cpu.name().into(),
@@ -353,27 +331,3 @@ impl Default for Monitor {
 		Self::new()
 	}
 }
-
-/*
-fn get_vmstat_cpu_usage() -> Option<f32> {
-	let output = Command::new("vmstat")
-		.args(&["1", "2"])
-		.output()
-		.ok()?;
-
-	let stdout = String::from_utf8_lossy(&output.stdout);
-	let lines: Vec<&str> = stdout.lines().collect();
-
-	// Last line should be the actual sampled data
-	let data_line = lines.iter().rev().find(|line| line.trim().chars().next().map_or(false, |c| c.is_digit(10)))?;
-
-	let columns: Vec<&str> = data_line.split_whitespace().collect();
-	if columns.len() < 15 {
-		return None;
-	}
-
-	// %idle is usually column 15, 0-based index 14
-	let idle: f32 = columns[14].parse().ok()?;
-	Some(100.0 - idle)
-}
-*/
