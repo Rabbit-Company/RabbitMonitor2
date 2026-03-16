@@ -78,16 +78,13 @@ systemctl enable --now rabbitmonitor
 # Upgrade
 
 ```bash
-# Stop service
-systemctl stop rabbitmonitor
-
 # Download Rabbit Monitor
 wget https://github.com/Rabbit-Company/RabbitMonitor2/releases/latest/download/rabbitmonitor-$(uname -m)-gnu
 sudo chmod 777 rabbitmonitor-$(uname -m)-gnu
 sudo mv rabbitmonitor-$(uname -m)-gnu /usr/local/bin/rabbitmonitor
 
-# Start service
-systemctl start rabbitmonitor
+# Restart service
+systemctl restart rabbitmonitor
 ```
 
 # Grafana Dashboard
