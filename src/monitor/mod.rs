@@ -1,33 +1,41 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
-use battery::Battery;
-use chrono::Utc;
-use components::Component;
-use processes::Process;
-use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, Pid, ProcessRefreshKind, System};
-use system_info::SystemInfo;
+use self::{
+	memory::Memory, network::Network, processor::Processor, settings::Settings, storage::Storage,
+	swap::Swap,
+};
 use crate::monitor::energy::Energy;
 use crate::monitor::processor::Thread;
 use crate::monitor::ups::UPS;
 use crate::utils::mega_bits;
-use self::{processor::Processor, memory::Memory, swap::Swap, storage::Storage, network::Network, settings::Settings};
+use battery::Battery;
+use chrono::Utc;
+use components::Component;
+use docker::DockerContainer;
+use processes::Process;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
+use sysinfo::{
+	Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, Pid,
+	ProcessRefreshKind, System,
+};
+use system_info::SystemInfo;
 
-pub mod settings;
-pub mod system_info;
-pub mod processor;
-pub mod memory;
-pub mod swap;
-pub mod storage;
-pub mod network;
-pub mod components;
-pub mod processes;
 pub mod battery;
-pub mod ups;
+pub mod components;
+pub mod docker;
 pub mod energy;
+pub mod memory;
+pub mod network;
+pub mod processes;
+pub mod processor;
+pub mod settings;
+pub mod storage;
+pub mod swap;
+pub mod system_info;
+pub mod ups;
 
-pub struct Monitor{
+pub struct Monitor {
 	pub system: System,
 	pub disks: Disks,
 	pub networks: Networks,
@@ -44,16 +52,19 @@ pub struct Monitor{
 	pub network_interfaces: HashMap<String, Network>,
 	pub component_list: HashMap<String, Component>,
 	pub process_list: HashMap<String, Process>,
-	pub refreshed: Instant
+	pub docker_monitor: Option<docker::DockerMonitor>,
+	pub docker_containers: HashMap<String, DockerContainer>,
+	pub refreshed: Instant,
 }
 
-impl Monitor{
-
-	pub fn new() -> Self{
+impl Monitor {
+	pub fn new() -> Self {
 		let mut sys = System::new_all();
 		sys.refresh_all();
 
-		let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage().with_io_usage());
+		let disks = Disks::new_with_refreshed_list_specifics(
+			DiskRefreshKind::nothing().with_storage().with_io_usage(),
+		);
 		let networks = Networks::new_with_refreshed_list();
 		let components = Components::new_with_refreshed_list();
 
@@ -71,10 +82,36 @@ impl Monitor{
 		processor.arch = System::cpu_arch();
 		processor.thread_count = sys.cpus().len() as u64;
 
-		Monitor {system: sys, disks, networks, components, settings: Settings::new(), system_info, processor, memory: Memory::new(), swap: Swap::new(), energy: Arc::new(Mutex::new(Energy::new())), storage_devices: HashMap::new(), network_interfaces: HashMap::new(), component_list: HashMap::new(), process_list: HashMap::new(), upses: HashMap::new(), batteries: HashMap::new(), refreshed: Instant::now() }
+		Monitor {
+			system: sys,
+			disks,
+			networks,
+			components,
+			settings: Settings::new(),
+			system_info,
+			processor,
+			memory: Memory::new(),
+			swap: Swap::new(),
+			energy: Arc::new(Mutex::new(Energy::new())),
+			storage_devices: HashMap::new(),
+			network_interfaces: HashMap::new(),
+			component_list: HashMap::new(),
+			process_list: HashMap::new(),
+			docker_monitor: None,
+			docker_containers: HashMap::new(),
+			upses: HashMap::new(),
+			batteries: HashMap::new(),
+			refreshed: Instant::now(),
+		}
 	}
 
-	pub fn refresh(&mut self){
+	pub fn start_docker_monitor(&mut self) {
+		let mut dm = docker::DockerMonitor::new();
+		dm.start(self.settings.containers.clone());
+		self.docker_monitor = Some(dm);
+	}
+
+	pub fn refresh(&mut self) {
 		let now = Duration::from_millis(Utc::now().timestamp_millis() as u64);
 
 		self.cpu(now);
@@ -85,6 +122,7 @@ impl Monitor{
 		self.componenet(now);
 		self.processes(now);
 		self.ups(now);
+		self.docker(now);
 
 		if self.settings.energy.enabled {
 			self.energy_async(now);
@@ -93,47 +131,68 @@ impl Monitor{
 		self.refreshed = Instant::now();
 	}
 
-	pub fn cpu(&mut self, now: Duration){
+	pub fn cpu(&mut self, now: Duration) {
 		let load_average = System::load_average();
 		self.processor.min1 = load_average.one;
 		self.processor.min5 = load_average.five;
 		self.processor.min15 = load_average.fifteen;
 
-		self.system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
+		self
+			.system
+			.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
 
 		self.processor.percent = self.system.global_cpu_usage();
 
-		self.processor.threads = self.system.cpus().iter().map(|cpu| Thread {
-    	name: cpu.name().into(),
-    	brand: cpu.brand().into(),
-    	cpu_usage: cpu.cpu_usage(),
-    	frequency: cpu.frequency(),
-		}).collect();
+		self.processor.threads = self
+			.system
+			.cpus()
+			.iter()
+			.map(|cpu| Thread {
+				name: cpu.name().into(),
+				brand: cpu.brand().into(),
+				cpu_usage: cpu.cpu_usage(),
+				frequency: cpu.frequency(),
+			})
+			.collect();
 
 		self.processor.refreshed = now;
 	}
 
-	pub fn memory(&mut self, now: Duration){
-		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
+	pub fn memory(&mut self, now: Duration) {
+		self
+			.system
+			.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 		self.memory.total = self.system.total_memory();
 		self.memory.available = self.system.available_memory();
 		self.memory.used = self.system.used_memory();
 		self.memory.free = self.system.free_memory();
 
-		let memory_percent: f64 = (self.system.used_memory() as f64 / self.system.total_memory() as f64) * 100.0;
-		self.memory.percent = if !f64::is_nan(memory_percent) { memory_percent } else { 0.0 };
+		let memory_percent: f64 =
+			(self.system.used_memory() as f64 / self.system.total_memory() as f64) * 100.0;
+		self.memory.percent = if !f64::is_nan(memory_percent) {
+			memory_percent
+		} else {
+			0.0
+		};
 
 		self.memory.refreshed = now;
 	}
 
-	pub fn swap(&mut self, now: Duration){
-		self.system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_swap());
+	pub fn swap(&mut self, now: Duration) {
+		self
+			.system
+			.refresh_memory_specifics(MemoryRefreshKind::nothing().with_swap());
 		self.swap.total = self.system.total_swap();
 		self.swap.used = self.system.used_swap();
 		self.swap.free = self.system.free_swap();
 
-		let swap_percent: f64 = (self.system.used_swap() as f64 / self.system.total_swap() as f64) * 100.0;
-		self.swap.percent = if !f64::is_nan(swap_percent) { swap_percent } else { 0.0 };
+		let swap_percent: f64 =
+			(self.system.used_swap() as f64 / self.system.total_swap() as f64) * 100.0;
+		self.swap.percent = if !f64::is_nan(swap_percent) {
+			swap_percent
+		} else {
+			0.0
+		};
 
 		self.swap.refreshed = now;
 	}
@@ -176,11 +235,14 @@ impl Monitor{
 				}
 			});
 		}
-  }
+	}
 
-	pub fn storage(&mut self, now: Duration){
+	pub fn storage(&mut self, now: Duration) {
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
-		self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage().with_io_usage());
+		self.disks.refresh_specifics(
+			true,
+			DiskRefreshKind::nothing().with_storage().with_io_usage(),
+		);
 
 		let mut millis: f64 = monitoring_time as f64 / 1000.0;
 		if millis == 0.0 {
@@ -201,25 +263,28 @@ impl Monitor{
 			let usage = disk.usage();
 
 			let mut percent: f64 = (used as f64 / total as f64) * 100.0;
-			percent = if !f64::is_nan(percent) { percent }else{ 0.0 };
+			percent = if !f64::is_nan(percent) { percent } else { 0.0 };
 
-			self.storage_devices.insert(name.clone(), Storage {
-				name,
-				mount_point: mount,
-				total,
-				used,
-				free,
-				percent,
-				read_speed: usage.read_bytes as f64 / millis,
-				write_speed: usage.written_bytes as f64 / millis,
-				total_read_bytes: usage.total_read_bytes,
-				total_written_bytes: usage.total_written_bytes,
-				refreshed: now,
-			});
+			self.storage_devices.insert(
+				name.clone(),
+				Storage {
+					name,
+					mount_point: mount,
+					total,
+					used,
+					free,
+					percent,
+					read_speed: usage.read_bytes as f64 / millis,
+					write_speed: usage.written_bytes as f64 / millis,
+					total_read_bytes: usage.total_read_bytes,
+					total_written_bytes: usage.total_written_bytes,
+					refreshed: now,
+				},
+			);
 		}
 	}
 
-	pub fn network(&mut self, now: Duration){
+	pub fn network(&mut self, now: Duration) {
 		let monitoring_time: u64 = self.refreshed.elapsed().as_millis() as u64;
 		self.networks.refresh(true);
 
@@ -229,53 +294,64 @@ impl Monitor{
 		}
 
 		for (iface, network) in self.networks.list() {
-
 			if !self.settings.interfaces.is_empty() && !self.settings.interfaces.contains(iface) {
 				continue; // Skip if not in the user-defined interface list
 			}
 
 			let download = mega_bits(network.received() as f64 / millis);
 			let upload = mega_bits(network.transmitted() as f64 / millis);
-			self.network_interfaces.insert(iface.clone(), Network {
-				download,
-				upload,
-				total_errors_on_received: network.total_errors_on_received(),
-				total_errors_on_transmitted: network.total_errors_on_transmitted(),
-				total_packets_received: network.total_packets_received(),
-				total_packets_transmitted: network.total_packets_transmitted(),
-				refreshed: now
-			});
+			self.network_interfaces.insert(
+				iface.clone(),
+				Network {
+					download,
+					upload,
+					total_errors_on_received: network.total_errors_on_received(),
+					total_errors_on_transmitted: network.total_errors_on_transmitted(),
+					total_packets_received: network.total_packets_received(),
+					total_packets_transmitted: network.total_packets_transmitted(),
+					refreshed: now,
+				},
+			);
 		}
 	}
 
-	pub fn componenet(&mut self, now: Duration){
+	pub fn componenet(&mut self, now: Duration) {
 		self.components.refresh(true);
 
 		for component in self.components.list() {
 			let label = component.label().to_string();
 
-			if !self.settings.components.is_empty() && self.settings.components.contains(&label){
+			if !self.settings.components.is_empty() && self.settings.components.contains(&label) {
 				continue; // Skip if not in the user-defined components list
 			}
 
-			self.component_list.insert(component.label().to_string(), Component {
-				label: component.label().to_string(),
-				temperature: component.temperature(),
-				critical: component.critical(),
-				max: component.max(),
-				refreshed: now
-			});
+			self.component_list.insert(
+				component.label().to_string(),
+				Component {
+					label: component.label().to_string(),
+					temperature: component.temperature(),
+					critical: component.critical(),
+					max: component.max(),
+					refreshed: now,
+				},
+			);
 		}
 	}
 
-	pub fn ups(&mut self, now: Duration){
-		for ups_name in &self.settings.upses{
+	pub fn ups(&mut self, now: Duration) {
+		for ups_name in &self.settings.upses {
 			let ups_data = UPS::get_ups_data(ups_name, now).unwrap_or(UPS::new());
 			self.upses.insert(ups_name.to_string(), ups_data);
 		}
 	}
 
-	pub fn processes(&mut self, now: Duration){
+	pub fn docker(&mut self, now: Duration) {
+		if let Some(ref dm) = self.docker_monitor {
+			self.docker_containers = dm.snapshot(now);
+		}
+	}
+
+	pub fn processes(&mut self, now: Duration) {
 		let mut pids_to_refresh = Vec::new();
 
 		for key in &self.settings.processes {
@@ -309,10 +385,7 @@ impl Monitor{
 					sys_proc.name().to_string_lossy().to_string()
 				};
 
-				self.process_list
-					.entry(key.clone())
-					.or_default()
-					.pid = pid.as_u32();
+				self.process_list.entry(key.clone()).or_default().pid = pid.as_u32();
 
 				let proc_entry = self.process_list.get_mut(&key).unwrap();
 				proc_entry.name = sys_proc.name().to_string_lossy().to_string();
@@ -323,7 +396,6 @@ impl Monitor{
 			}
 		}
 	}
-
 }
 
 impl Default for Monitor {

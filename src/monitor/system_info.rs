@@ -1,4 +1,3 @@
-
 pub struct SystemInfo {
 	pub name: String,
 	pub kernel_version: String,
@@ -10,8 +9,7 @@ pub struct SystemInfo {
 }
 
 impl SystemInfo {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		SystemInfo {
 			name: String::new(),
 			kernel_version: String::new(),
@@ -22,7 +20,6 @@ impl SystemInfo {
 			boot_time: 0,
 		}
 	}
-
 }
 
 impl Default for SystemInfo {

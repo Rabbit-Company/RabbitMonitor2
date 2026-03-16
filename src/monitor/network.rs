@@ -11,8 +11,7 @@ pub struct Network {
 }
 
 impl Network {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Network {
 			download: 0.0,
 			upload: 0.0,
@@ -23,7 +22,6 @@ impl Network {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Network {

@@ -12,8 +12,7 @@ pub struct Energy {
 }
 
 impl Energy {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Energy {
 			power_consumption: 0.0,
 			refreshed: Duration::from_secs(0),
@@ -22,7 +21,7 @@ impl Energy {
 	}
 
 	pub fn get_power_usage_w() -> Option<f64> {
-    Self::get_dcmi_power_with_info()
+		Self::get_dcmi_power_with_info()
 			.and_then(|dcmi| dcmi.power)
 			.or_else(Self::get_sensor_power)
 	}
@@ -66,15 +65,12 @@ impl Energy {
 
 		Some(DCMI {
 			power: power_value,
-			sampling_period_seconds: sampling_period_seconds
+			sampling_period_seconds: sampling_period_seconds,
 		})
 	}
 
 	pub fn get_sensor_power() -> Option<f64> {
-		let output = Command::new("ipmitool")
-			.arg("sensor")
-			.output()
-			.ok()?;
+		let output = Command::new("ipmitool").arg("sensor").output().ok()?;
 
 		if !output.status.success() {
 			return None;
@@ -107,18 +103,20 @@ impl Energy {
 								let sensor_name = parts[0].trim().to_lowercase();
 
 								// Priority for system-wide power sensors
-								if sensor_name.contains("pwr consumption") ||
-									sensor_name.contains("system power") ||
-									sensor_name.contains("total power") ||
-									sensor_name.contains("power meter") ||
-									sensor_name.contains("power1") {
+								if sensor_name.contains("pwr consumption")
+									|| sensor_name.contains("system power")
+									|| sensor_name.contains("total power")
+									|| sensor_name.contains("power meter")
+									|| sensor_name.contains("power1")
+								{
 									return Some(value);
 								}
 
 								// Accumulate power readings from individual components
-								if sensor_name.contains("cpu") ||
-									sensor_name.contains("dimm") ||
-									sensor_name.contains("psu") && !sensor_name.contains("out") {
+								if sensor_name.contains("cpu")
+									|| sensor_name.contains("dimm")
+									|| sensor_name.contains("psu") && !sensor_name.contains("out")
+								{
 									total_power += value;
 									found_power = true;
 								}
@@ -138,21 +136,20 @@ impl Energy {
 	}
 
 	pub fn refresh_dcmi(&mut self, now: Duration) {
-		if let Some(power) = Self::get_dcmi_power_with_info().and_then(|dcmi| dcmi.power){
-    	self.power_consumption = power;
-    }
-
-		self.refreshed = now;
-	}
-
-	pub fn refresh_sensor(&mut self, now: Duration) {
-		if let Some(power) = Self::get_sensor_power(){
+		if let Some(power) = Self::get_dcmi_power_with_info().and_then(|dcmi| dcmi.power) {
 			self.power_consumption = power;
 		}
 
 		self.refreshed = now;
 	}
 
+	pub fn refresh_sensor(&mut self, now: Duration) {
+		if let Some(power) = Self::get_sensor_power() {
+			self.power_consumption = power;
+		}
+
+		self.refreshed = now;
+	}
 }
 
 impl Default for Energy {

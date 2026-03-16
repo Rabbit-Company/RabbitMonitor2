@@ -1,4 +1,3 @@
-
 pub struct EnergySettings {
 	pub enabled: bool,
 	pub interval: Option<u64>,
@@ -12,6 +11,7 @@ pub struct Settings {
 	pub mounts: Vec<String>,
 	pub components: Vec<String>,
 	pub processes: Vec<String>,
+	pub containers: Vec<String>,
 	pub all_metrics: bool,
 	pub cpu_details: bool,
 	pub memory_details: bool,
@@ -21,16 +21,19 @@ pub struct Settings {
 }
 
 impl Settings {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Settings {
 			cache: 3,
-			energy: EnergySettings { enabled: false, interval: None },
+			energy: EnergySettings {
+				enabled: false,
+				interval: None,
+			},
 			upses: Vec::new(),
 			interfaces: Vec::new(),
 			mounts: Vec::new(),
 			components: Vec::new(),
 			processes: Vec::new(),
+			containers: Vec::new(),
 			all_metrics: false,
 			cpu_details: false,
 			memory_details: false,
@@ -39,7 +42,6 @@ impl Settings {
 			network_details: false,
 		}
 	}
-
 }
 
 impl Default for Settings {

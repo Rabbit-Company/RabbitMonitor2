@@ -9,8 +9,7 @@ pub struct Component {
 }
 
 impl Component {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Component {
 			label: String::new(),
 			temperature: Some(0.0),
@@ -19,7 +18,6 @@ impl Component {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Component {

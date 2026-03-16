@@ -10,8 +10,7 @@ pub struct Process {
 }
 
 impl Process {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Process {
 			pid: 0,
 			name: String::new(),
@@ -21,7 +20,6 @@ impl Process {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Process {

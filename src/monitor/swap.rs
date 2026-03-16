@@ -9,8 +9,7 @@ pub struct Swap {
 }
 
 impl Swap {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Swap {
 			total: 0,
 			used: 0,
@@ -19,7 +18,6 @@ impl Swap {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Swap {

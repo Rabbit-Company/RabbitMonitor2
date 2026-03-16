@@ -15,8 +15,7 @@ pub struct Storage {
 }
 
 impl Storage {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Storage {
 			name: "".to_string(),
 			mount_point: "/".to_string(),
@@ -31,7 +30,6 @@ impl Storage {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Storage {

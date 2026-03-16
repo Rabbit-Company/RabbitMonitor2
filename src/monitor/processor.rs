@@ -4,7 +4,7 @@ pub struct Thread {
 	pub name: String,
 	pub brand: String,
 	pub cpu_usage: f32,
-	pub frequency: u64
+	pub frequency: u64,
 }
 
 pub struct Processor {
@@ -19,8 +19,7 @@ pub struct Processor {
 }
 
 impl Processor {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Processor {
 			min1: 0.0,
 			min5: 0.0,
@@ -32,7 +31,6 @@ impl Processor {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Processor {

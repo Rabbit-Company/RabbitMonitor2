@@ -19,10 +19,12 @@ Available options:
       --ups-list                 Show available UPS and exit
       --component-list           Show available components and exit
       --process-list             Show all processes and exit
+      --container-list           Show running Docker containers and exit
       --interfaces <INTERFACES>  Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
       --mounts <MOUNTS>          Comma-separated list of mount points to monitor (e.g., "/,/mnt/data")
       --components <COMPONENTS>  Comma-separated list of components to monitor (e.g., "GPU,Battery")
       --processes <PROCESSES>    Comma-separated list of process PIDs or names to monitor (e.g., "18295,rabbitmonitor")
+      --containers <CONTAINERS>  Comma-separated list of Docker container names to monitor (e.g., "nginx,redis")
       --all-metrics              Enable all detailed metrics
       --cpu-details              Enable detailed CPU metrics
       --memory-details           Enable detailed memory metrics
@@ -53,7 +55,7 @@ Running Rabbit Monitor in the background is a simple task, just make sure that i
 ```service
 [Unit]
 Description=Rabbit Monitor
-After=network.target
+After=network.target docker.service
 
 [Service]
 Type=simple

@@ -10,8 +10,7 @@ pub struct Memory {
 }
 
 impl Memory {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Memory {
 			total: 0,
 			available: 0,
@@ -21,7 +20,6 @@ impl Memory {
 			refreshed: Duration::from_secs(0),
 		}
 	}
-
 }
 
 impl Default for Memory {

@@ -1,6 +1,12 @@
 use std::time::Duration;
 
-use starship_battery::{units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::percent, ElectricPotential, Energy, Power, Ratio, ThermodynamicTemperature, Time}, State, Technology};
+use starship_battery::{
+	units::{
+		electric_potential::volt, energy::watt_hour, power::watt, ratio::percent, ElectricPotential,
+		Energy, Power, Ratio, ThermodynamicTemperature, Time,
+	},
+	State, Technology,
+};
 
 pub struct Battery {
 	pub state_of_charge: Ratio,
@@ -23,8 +29,7 @@ pub struct Battery {
 }
 
 impl Battery {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		Battery {
 			state_of_charge: Ratio::new::<percent>(0.0),
 			energy: Energy::new::<watt_hour>(0.0),
@@ -43,9 +48,8 @@ impl Battery {
 			model: None,
 			serial_number: None,
 			refreshed: Duration::from_secs(0),
-    }
+		}
 	}
-
 }
 
 impl Default for Battery {

@@ -1,7 +1,7 @@
 use axum::extract::State;
+use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::{response::Html, routing::get, Router};
-use axum::http::{StatusCode, header, HeaderValue};
 use axum_extra::headers::{authorization::Bearer, Authorization};
 use axum_extra::TypedHeader;
 use clap::Parser;
@@ -9,6 +9,7 @@ use monitor::Monitor;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::{thread::sleep, time::Duration};
 
+use crate::monitor::docker::DockerMonitor;
 use crate::monitor::energy::Energy;
 use crate::monitor::settings::EnergySettings;
 use crate::monitor::ups::UPS;
@@ -18,7 +19,7 @@ pub mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-	struct Args {
+struct Args {
 	/// Bind the server to specific address
 	#[arg(short, long, default_value_t = String::from("0.0.0.0"))]
 	address: String,
@@ -59,6 +60,10 @@ pub mod utils;
 	#[arg(long)]
 	process_list: bool,
 
+	/// Show running Docker containers and exit
+	#[arg(long)]
+	container_list: bool,
+
 	/// Comma-separated list of network interfaces to monitor (e.g., "eth0,wlan0")
 	#[arg(long, value_delimiter = ',')]
 	interfaces: Vec<String>,
@@ -74,6 +79,10 @@ pub mod utils;
 	/// Comma-separated list of process PIDs or names to monitor (e.g., "18295,rabbitmonitor")
 	#[arg(long, value_delimiter = ',')]
 	processes: Vec<String>,
+
+	/// Comma-separated list of Docker container names to monitor (e.g., "nginx,redis")
+	#[arg(long, value_delimiter = ',')]
+	containers: Vec<String>,
 
 	/// Enable all detailed metrics
 	#[arg(long, default_value_t = false)]
@@ -131,7 +140,11 @@ async fn main() {
 		let components = sysinfo::Components::new_with_refreshed_list();
 		println!("Available components:");
 		for component in &components {
-			println!("- {} ({}°C)", component.label(), component.temperature().unwrap_or(0.0));
+			println!(
+				"- {} ({}°C)",
+				component.label(),
+				component.temperature().unwrap_or(0.0)
+			);
 		}
 		return;
 	}
@@ -145,7 +158,30 @@ async fn main() {
 
 		println!("Available processes:");
 		for (pid, process) in processes {
-			println!("- {} ({}) [{}]", process.name().to_string_lossy(), pid, process.status());
+			println!(
+				"- {} ({}) [{}]",
+				process.name().to_string_lossy(),
+				pid,
+				process.status()
+			);
+		}
+		return;
+	}
+
+	if args.container_list {
+		if !DockerMonitor::is_docker_available() {
+			println!("Docker is not available or not running.");
+			return;
+		}
+
+		let containers = DockerMonitor::list_containers();
+		if containers.is_empty() {
+			println!("No running Docker containers found.");
+		} else {
+			println!("Running Docker containers:");
+			for name in containers {
+				println!("- {}", name);
+			}
 		}
 		return;
 	}
@@ -153,10 +189,10 @@ async fn main() {
 	if args.ups_list {
 		let upses = UPS::detect_ups().unwrap_or_else(|| vec![]);
 
-    if upses.is_empty() {
+		if upses.is_empty() {
 			println!("No UPS devices detected.");
 			return;
-    }
+		}
 
 		println!("Available UPS devices:");
 		for ups_name in upses {
@@ -173,52 +209,54 @@ async fn main() {
 					println!("  - Failed to fetch UPS data.");
 				}
 			}
-    }
+		}
 		return;
 	}
 
 	if args.battery_list {
 		match starship_battery::Manager::new() {
-			Ok(manager) => {
-				match manager.batteries() {
-					Ok(batteries) => {
-						println!("Available batteries:");
-						for (i, battery) in batteries.enumerate() {
-							match battery {
-								Ok(bat) => {
-									println!("\nBattery #{}:", i + 1);
-									println!("  - Vendor: {}", bat.vendor().unwrap_or("Unknown"));
-									println!("  - Model: {}", bat.model().unwrap_or("Unknown"));
-									println!("  - Serial: {}", bat.serial_number().unwrap_or("Unknown"));
-									println!("  - Technology: {:?}", bat.technology());
-									println!("  - State: {:?}", bat.state());
-									println!("  - Charge: {:.1}%", bat.state_of_charge().value * 100.0);
-									println!("  - Energy: {:.2} Wh / {:.2} Wh", bat.energy().value / 3600.0, bat.energy_full().value / 3600.0);
-									println!("  - Health: {:.2}%", bat.state_of_health().value * 100.0);
-									println!("  - Voltage: {:.2} V", bat.voltage().value);
-									if let Some(temp) = bat.temperature() {
-										println!("  - Temperature: {:.1}°C", temp.value);
-									}
-									if let Some(cycles) = bat.cycle_count() {
-										println!("  - Cycle count: {}", cycles);
-									}
-									if let Some(time) = bat.time_to_full() {
-										println!("  - Time to charge: {:.2} minutes", time.value / 60.0);
-									}
-									if let Some(time) = bat.time_to_empty() {
-										println!("  - Time to discharge: {:.2} minutes", time.value / 60.0);
-									}
-									println!();
-								},
-								Err(e) => {
-									println!("  - Error reading battery info: {}", e);
+			Ok(manager) => match manager.batteries() {
+				Ok(batteries) => {
+					println!("Available batteries:");
+					for (i, battery) in batteries.enumerate() {
+						match battery {
+							Ok(bat) => {
+								println!("\nBattery #{}:", i + 1);
+								println!("  - Vendor: {}", bat.vendor().unwrap_or("Unknown"));
+								println!("  - Model: {}", bat.model().unwrap_or("Unknown"));
+								println!("  - Serial: {}", bat.serial_number().unwrap_or("Unknown"));
+								println!("  - Technology: {:?}", bat.technology());
+								println!("  - State: {:?}", bat.state());
+								println!("  - Charge: {:.1}%", bat.state_of_charge().value * 100.0);
+								println!(
+									"  - Energy: {:.2} Wh / {:.2} Wh",
+									bat.energy().value / 3600.0,
+									bat.energy_full().value / 3600.0
+								);
+								println!("  - Health: {:.2}%", bat.state_of_health().value * 100.0);
+								println!("  - Voltage: {:.2} V", bat.voltage().value);
+								if let Some(temp) = bat.temperature() {
+									println!("  - Temperature: {:.1}°C", temp.value);
 								}
+								if let Some(cycles) = bat.cycle_count() {
+									println!("  - Cycle count: {}", cycles);
+								}
+								if let Some(time) = bat.time_to_full() {
+									println!("  - Time to charge: {:.2} minutes", time.value / 60.0);
+								}
+								if let Some(time) = bat.time_to_empty() {
+									println!("  - Time to discharge: {:.2} minutes", time.value / 60.0);
+								}
+								println!();
+							}
+							Err(e) => {
+								println!("  - Error reading battery info: {}", e);
 							}
 						}
-					},
-					Err(e) => {
-						println!("Failed to list batteries: {}", e);
 					}
+				}
+				Err(e) => {
+					println!("Failed to list batteries: {}", e);
 				}
 			},
 			Err(e) => {
@@ -226,31 +264,41 @@ async fn main() {
 			}
 		}
 		return;
-  }
+	}
 
 	let enable_ipmitool = Energy::get_power_usage_w().is_some();
 
 	let power_usage_interval = Energy::get_dcmi_power_with_info()
-    .and_then(|dcmi| dcmi.power.and(dcmi.sampling_period_seconds));
+		.and_then(|dcmi| dcmi.power.and(dcmi.sampling_period_seconds));
 
 	let upses = UPS::detect_ups().unwrap_or(Vec::new());
+
+	let enable_docker = !args.containers.is_empty() || DockerMonitor::is_docker_available();
 
 	std::thread::spawn(move || {
 		{
 			let mut temp: MutexGuard<Monitor> = monitor.lock().unwrap();
 			temp.settings.cache = args.cache;
 			temp.settings.interfaces = args.interfaces;
-			temp.settings.energy = EnergySettings{ enabled: enable_ipmitool, interval: power_usage_interval };
+			temp.settings.energy = EnergySettings {
+				enabled: enable_ipmitool,
+				interval: power_usage_interval,
+			};
 			temp.settings.upses = upses;
 			temp.settings.mounts = args.mounts;
 			temp.settings.components = args.components;
 			temp.settings.processes = args.processes;
+			temp.settings.containers = args.containers;
 			temp.settings.all_metrics = args.all_metrics;
 			temp.settings.cpu_details = args.cpu_details;
 			temp.settings.memory_details = args.memory_details;
 			temp.settings.swap_details = args.swap_details;
 			temp.settings.storage_details = args.storage_details;
 			temp.settings.network_details = args.network_details;
+
+			if enable_docker {
+				temp.start_docker_monitor();
+			}
 		}
 
 		loop {
@@ -272,16 +320,24 @@ async fn main() {
 	println!(
 		"Rabbit Monitor listening on {} (Auth: {})",
 		&address,
-		if args.token.is_some() { "Enabled" } else { "Disabled" }
+		if args.token.is_some() {
+			"Enabled"
+		} else {
+			"Disabled"
+		}
 	);
 	axum::serve(listener, app).await.unwrap();
 }
 
 async fn index(
-	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
+	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>,
 ) -> impl IntoResponse {
 	if token.is_some() {
-		return (StatusCode::NOT_FOUND, "Rabbit Monitor v10.1.0\n\n\nMain page is disabled when Bearer authentication is enabled.").into_response();
+		return (
+			StatusCode::NOT_FOUND,
+			"Rabbit Monitor v10.2.0\n\n\nMain page is disabled when Bearer authentication is enabled.",
+		)
+			.into_response();
 	}
 
 	Html(utils::main_page(state)).into_response()
@@ -289,7 +345,7 @@ async fn index(
 
 async fn metrics(
 	auth: Option<TypedHeader<Authorization<Bearer>>>,
-	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>
+	State((state, token)): State<(Arc<Mutex<Monitor>>, Option<String>)>,
 ) -> impl IntoResponse {
 	if let Some(token) = &token {
 		if let Some(TypedHeader(auth)) = auth {
@@ -297,18 +353,30 @@ async fn metrics(
 				let body = utils::create_metrics(state);
 				return (
 					StatusCode::OK,
-					[(header::CONTENT_TYPE, HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"))],
+					[(
+						header::CONTENT_TYPE,
+						HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"),
+					)],
 					body,
-				).into_response();
+				)
+					.into_response();
 			}
 		}
-		return (StatusCode::UNAUTHORIZED, "Unauthorized: A valid Bearer token is required to access this endpoint.").into_response();
+		return (
+			StatusCode::UNAUTHORIZED,
+			"Unauthorized: A valid Bearer token is required to access this endpoint.",
+		)
+			.into_response();
 	}
 
 	let body = utils::create_metrics(state);
 	(
 		StatusCode::OK,
-		[(header::CONTENT_TYPE, HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"))],
+		[(
+			header::CONTENT_TYPE,
+			HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"),
+		)],
 		body,
-	).into_response()
+	)
+		.into_response()
 }

@@ -15,8 +15,7 @@ pub struct UPS {
 }
 
 impl UPS {
-
-	pub fn new() -> Self{
+	pub fn new() -> Self {
 		UPS {
 			manufacturer: String::new(),
 			model: String::new(),
@@ -34,10 +33,7 @@ impl UPS {
 
 	pub fn detect_ups() -> Option<Vec<String>> {
 		// List all UPS devices managed by NUT
-		let output = Command::new("upsc")
-			.arg("-l")
-			.output()
-			.ok()?;
+		let output = Command::new("upsc").arg("-l").output().ok()?;
 
 		if !output.status.success() {
 			return None;
@@ -59,10 +55,7 @@ impl UPS {
 	}
 
 	pub fn get_ups_data(ups_name: &str, refreshed: Duration) -> Option<UPS> {
-		let output = Command::new("upsc")
-			.arg(ups_name)
-			.output()
-			.ok()?;
+		let output = Command::new("upsc").arg(ups_name).output().ok()?;
 
 		if !output.status.success() {
 			return None;
@@ -80,13 +73,13 @@ impl UPS {
 			output_voltage: 0.0,
 			real_power_nominal: 0.0,
 			power_usage: 0.0,
-			refreshed: refreshed
+			refreshed: refreshed,
 		};
 
 		for line in stdout.lines() {
 			if line.starts_with("Init SSL") {
-        continue; // Skip SSL warning
-    	}
+				continue; // Skip SSL warning
+			}
 
 			let parts: Vec<&str> = line.split(':').collect();
 			if parts.len() != 2 {
