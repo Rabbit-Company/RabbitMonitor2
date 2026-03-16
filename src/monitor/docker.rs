@@ -1,18 +1,37 @@
 use std::collections::HashMap;
+use std::fs;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use crate::utils::mega_bits;
+
+struct NetDevCounters {
+	rx_bytes: u64,
+	tx_bytes: u64,
+	rx_packets: u64,
+	tx_packets: u64,
+	rx_errors: u64,
+	tx_errors: u64,
+}
+
 pub struct DockerContainer {
 	pub name: String,
+	pub pid: u32,
 	pub cpu_percent: f64,
 	pub memory_usage: u64,
 	pub memory_limit: u64,
 	pub memory_percent: f64,
+	pub download: f64,
+	pub upload: f64,
 	pub net_rx_bytes: u64,
 	pub net_tx_bytes: u64,
+	pub total_packets_received: u64,
+	pub total_packets_transmitted: u64,
+	pub total_errors_on_received: u64,
+	pub total_errors_on_transmitted: u64,
 	pub block_read_bytes: u64,
 	pub block_write_bytes: u64,
 	pub pids: u64,
@@ -23,12 +42,19 @@ impl DockerContainer {
 	pub fn new() -> Self {
 		DockerContainer {
 			name: String::new(),
+			pid: 0,
 			cpu_percent: 0.0,
 			memory_usage: 0,
 			memory_limit: 0,
 			memory_percent: 0.0,
+			download: 0.0,
+			upload: 0.0,
 			net_rx_bytes: 0,
 			net_tx_bytes: 0,
+			total_packets_received: 0,
+			total_packets_transmitted: 0,
+			total_errors_on_received: 0,
+			total_errors_on_transmitted: 0,
 			block_read_bytes: 0,
 			block_write_bytes: 0,
 			pids: 0,
@@ -43,8 +69,15 @@ impl Default for DockerContainer {
 	}
 }
 
+struct PrevNetState {
+	rx_bytes: u64,
+	tx_bytes: u64,
+	timestamp: Duration,
+}
+
 pub struct DockerMonitor {
 	pub containers: Arc<Mutex<HashMap<String, DockerContainer>>>,
+	prev_net: HashMap<String, PrevNetState>,
 	child: Option<Child>,
 }
 
@@ -52,6 +85,7 @@ impl DockerMonitor {
 	pub fn new() -> Self {
 		DockerMonitor {
 			containers: Arc::new(Mutex::new(HashMap::new())),
+			prev_net: HashMap::new(),
 			child: None,
 		}
 	}
@@ -147,20 +181,79 @@ impl DockerMonitor {
 		}
 	}
 
-	pub fn snapshot(&self, now: Duration) -> HashMap<String, DockerContainer> {
-		let map = self.containers.lock().unwrap();
+	pub fn snapshot(&mut self, now: Duration) -> HashMap<String, DockerContainer> {
+		let mut map = self.containers.lock().unwrap();
 		let mut result = HashMap::new();
+
+		let names_needing_pid: Vec<String> = map
+			.iter()
+			.filter(|(_, c)| c.pid == 0)
+			.map(|(name, _)| name.clone())
+			.collect();
+
+		if !names_needing_pid.is_empty() {
+			let pids = lookup_container_pids(&names_needing_pid);
+			for (name, pid) in pids {
+				if let Some(c) = map.get_mut(&name) {
+					c.pid = pid;
+				}
+			}
+		}
+
 		for (name, c) in map.iter() {
+			let net_counters = if c.pid > 0 { read_net_dev(c.pid) } else { None };
+
+			let (net_rx, net_tx, packets_rx, packets_tx, errors_rx, errors_tx) = match &net_counters {
+				Some(nc) => (
+					nc.rx_bytes,
+					nc.tx_bytes,
+					nc.rx_packets,
+					nc.tx_packets,
+					nc.rx_errors,
+					nc.tx_errors,
+				),
+				None => (c.net_rx_bytes, c.net_tx_bytes, 0, 0, 0, 0),
+			};
+
+			let (download, upload) = if let Some(prev) = self.prev_net.get(name) {
+				let elapsed = now.as_secs_f64() - prev.timestamp.as_secs_f64();
+				if elapsed > 0.0 {
+					let rx_delta = net_rx.saturating_sub(prev.rx_bytes) as f64;
+					let tx_delta = net_tx.saturating_sub(prev.tx_bytes) as f64;
+					(mega_bits(rx_delta / elapsed), mega_bits(tx_delta / elapsed))
+				} else {
+					(0.0, 0.0)
+				}
+			} else {
+				(0.0, 0.0)
+			};
+
+			self.prev_net.insert(
+				name.clone(),
+				PrevNetState {
+					rx_bytes: net_rx,
+					tx_bytes: net_tx,
+					timestamp: now,
+				},
+			);
+
 			result.insert(
 				name.clone(),
 				DockerContainer {
 					name: c.name.clone(),
+					pid: c.pid,
 					cpu_percent: c.cpu_percent,
 					memory_usage: c.memory_usage,
 					memory_limit: c.memory_limit,
 					memory_percent: c.memory_percent,
-					net_rx_bytes: c.net_rx_bytes,
-					net_tx_bytes: c.net_tx_bytes,
+					download,
+					upload,
+					net_rx_bytes: net_rx,
+					net_tx_bytes: net_tx,
+					total_packets_received: packets_rx,
+					total_packets_transmitted: packets_tx,
+					total_errors_on_received: errors_rx,
+					total_errors_on_transmitted: errors_tx,
 					block_read_bytes: c.block_read_bytes,
 					block_write_bytes: c.block_write_bytes,
 					pids: c.pids,
@@ -176,6 +269,85 @@ impl Drop for DockerMonitor {
 	fn drop(&mut self) {
 		self.stop();
 	}
+}
+
+fn lookup_container_pids(names: &[String]) -> HashMap<String, u32> {
+	let mut result = HashMap::new();
+
+	for name in names {
+		let output = Command::new("docker")
+			.args(["inspect", "--format", "{{.State.Pid}}", name])
+			.output();
+
+		if let Ok(out) = output {
+			if out.status.success() {
+				let pid_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+				if let Ok(pid) = pid_str.parse::<u32>() {
+					if pid > 0 {
+						result.insert(name.clone(), pid);
+					}
+				}
+			}
+		}
+	}
+
+	result
+}
+
+fn read_net_dev(pid: u32) -> Option<NetDevCounters> {
+	let path = format!("/proc/{}/net/dev", pid);
+	let content = fs::read_to_string(&path).ok()?;
+
+	let mut counters = NetDevCounters {
+		rx_bytes: 0,
+		tx_bytes: 0,
+		rx_packets: 0,
+		tx_packets: 0,
+		rx_errors: 0,
+		tx_errors: 0,
+	};
+
+	for line in content.lines() {
+		let line = line.trim();
+
+		let Some((iface, rest)) = line.split_once(':') else {
+			continue;
+		};
+
+		let iface = iface.trim();
+
+		if iface == "lo" {
+			continue;
+		}
+
+		let fields: Vec<&str> = rest.split_whitespace().collect();
+		if fields.len() < 11 {
+			continue;
+		}
+
+		// Receive fields:  0=bytes 1=packets 2=errs 3=drop 4=fifo 5=frame 6=compressed 7=multicast
+		// Transmit fields: 8=bytes 9=packets 10=errs 11=drop 12=fifo 13=colls 14=carrier 15=compressed
+		if let Ok(v) = fields[0].parse::<u64>() {
+			counters.rx_bytes += v;
+		}
+		if let Ok(v) = fields[1].parse::<u64>() {
+			counters.rx_packets += v;
+		}
+		if let Ok(v) = fields[2].parse::<u64>() {
+			counters.rx_errors += v;
+		}
+		if let Ok(v) = fields[8].parse::<u64>() {
+			counters.tx_bytes += v;
+		}
+		if let Ok(v) = fields[9].parse::<u64>() {
+			counters.tx_packets += v;
+		}
+		if let Ok(v) = fields[10].parse::<u64>() {
+			counters.tx_errors += v;
+		}
+	}
+
+	Some(counters)
 }
 
 fn extract_json(line: &str) -> Option<&str> {
@@ -214,12 +386,19 @@ fn parse_docker_stats_line(line: &str) -> Option<DockerContainer> {
 
 	Some(DockerContainer {
 		name,
+		pid: 0,
 		cpu_percent,
 		memory_usage,
 		memory_limit,
 		memory_percent: mem_percent,
+		download: 0.0,
+		upload: 0.0,
 		net_rx_bytes,
 		net_tx_bytes,
+		total_packets_received: 0,
+		total_packets_transmitted: 0,
+		total_errors_on_received: 0,
+		total_errors_on_transmitted: 0,
 		block_read_bytes,
 		block_write_bytes,
 		pids,

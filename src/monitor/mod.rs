@@ -346,7 +346,7 @@ impl Monitor {
 	}
 
 	pub fn docker(&mut self, now: Duration) {
-		if let Some(ref dm) = self.docker_monitor {
+		if let Some(ref mut dm) = self.docker_monitor {
 			self.docker_containers = dm.snapshot(now);
 		}
 	}

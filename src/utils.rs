@@ -139,7 +139,7 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String {
 		metrics += &create_info_metric(
 			"version_info",
 			"Rabbit Monitor version",
-			&[("version", "v10.2.0")],
+			&[("version", "v10.2.1")],
 		);
 		metrics += &create_info_metric(
 			"system_info",
@@ -735,34 +735,102 @@ pub fn create_metrics(monitor: Arc<Mutex<Monitor>>) -> String {
 			}
 
 			metrics += &create_metric_header(
-				"docker_network_rx",
-				"Docker container network received in bytes",
+				"docker_network_download_speed",
+				"Docker container download speed in bytes/sec",
 				"gauge",
-				Some("bytes"),
+				Some("bytes_per_second"),
 			);
 			for (name, container) in &temp.docker_containers {
 				metrics += &create_gauge_metric_line(
-					"docker_network_rx",
-					&container.net_rx_bytes.to_string(),
-					Some("bytes"),
+					"docker_network_download_speed",
+					&container.download.to_string(),
+					Some("bytes_per_second"),
 					&[("container", name)],
 					container.refreshed,
 				);
 			}
 
 			metrics += &create_metric_header(
-				"docker_network_tx",
-				"Docker container network transmitted in bytes",
+				"docker_network_upload_speed",
+				"Docker container upload speed in bytes/sec",
 				"gauge",
-				Some("bytes"),
+				Some("bytes_per_second"),
 			);
 			for (name, container) in &temp.docker_containers {
 				metrics += &create_gauge_metric_line(
-					"docker_network_tx",
-					&container.net_tx_bytes.to_string(),
-					Some("bytes"),
+					"docker_network_upload_speed",
+					&container.upload.to_string(),
+					Some("bytes_per_second"),
 					&[("container", name)],
 					container.refreshed,
+				);
+			}
+
+			metrics += &create_metric_header(
+				"docker_network_packets_received",
+				"Docker container total number of incoming packets",
+				"counter",
+				None,
+			);
+			for (name, container) in &temp.docker_containers {
+				metrics += &create_counter_metric_line(
+					"docker_network_packets_received",
+					&container.total_packets_received.to_string(),
+					None,
+					&[("container", name)],
+					container.refreshed,
+					temp.system_info.boot_time,
+				);
+			}
+
+			metrics += &create_metric_header(
+				"docker_network_packets_transmitted",
+				"Docker container total number of outgoing packets",
+				"counter",
+				None,
+			);
+			for (name, container) in &temp.docker_containers {
+				metrics += &create_counter_metric_line(
+					"docker_network_packets_transmitted",
+					&container.total_packets_transmitted.to_string(),
+					None,
+					&[("container", name)],
+					container.refreshed,
+					temp.system_info.boot_time,
+				);
+			}
+
+			metrics += &create_metric_header(
+				"docker_network_errors_received",
+				"Docker container total number of incoming errors",
+				"counter",
+				None,
+			);
+			for (name, container) in &temp.docker_containers {
+				metrics += &create_counter_metric_line(
+					"docker_network_errors_received",
+					&container.total_errors_on_received.to_string(),
+					None,
+					&[("container", name)],
+					container.refreshed,
+					temp.system_info.boot_time,
+				);
+			}
+
+			metrics += &create_metric_header(
+				"docker_network_errors_transmitted",
+				"Docker container total number of outgoing errors",
+				"counter",
+				None,
+			);
+			for (name, container) in &temp.docker_containers {
+				metrics += &create_counter_metric_line(
+					"docker_network_errors_transmitted",
+					&container.total_errors_on_transmitted.to_string(),
+					None,
+					&[("container", name)],
+					container.refreshed,
+					temp.system_info.boot_time,
 				);
 			}
 
@@ -889,7 +957,7 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		}}
 	</style>
 	<h1>Rabbit Monitor</h1>
-	<b>Version:</b> v10.2.0</br>
+	<b>Version:</b> v10.2.1</br>
 	<b>Fetch every:</b> {} seconds</br></br>
 	<table>
 	<tr><th>CPU Load</th><td>{:.2}%</td></tr>
@@ -939,12 +1007,14 @@ pub fn main_page(monitor: Arc<Mutex<Monitor>>) -> String {
 		html += r#"<tr><th colspan="2">Docker Containers</th></tr>"#;
 		for (name, container) in &temp.docker_containers {
 			html += &format!(
-				r#"<tr><th>{}</th><td>CPU: {:.2}% — RAM: {:.2}% ({} / {}) — PIDs: {}</td></tr>"#,
+				r#"<tr><th>{}</th><td>CPU: {:.2}% — RAM: {:.2}% ({} / {}) — ↓ {:.2} Mbps / ↑ {:.2} Mbps — PIDs: {}</td></tr>"#,
 				name,
 				container.cpu_percent,
 				container.memory_percent,
 				format_bytes_human(container.memory_usage),
 				format_bytes_human(container.memory_limit),
+				container.download,
+				container.upload,
 				container.pids,
 			);
 		}

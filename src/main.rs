@@ -335,7 +335,7 @@ async fn index(
 	if token.is_some() {
 		return (
 			StatusCode::NOT_FOUND,
-			"Rabbit Monitor v10.2.0\n\n\nMain page is disabled when Bearer authentication is enabled.",
+			"Rabbit Monitor v10.2.1\n\n\nMain page is disabled when Bearer authentication is enabled.",
 		)
 			.into_response();
 	}
